@@ -4,6 +4,13 @@ const SUBJECTS = [
   {
     subject: "physics-basics",
     name: "物理基礎",
+    objective: `物体の運動と様々なエネルギーに関わり、理科の見方・考え方を働かせ、見通しをもって観察、実験を行うことなどを通して、物体の運動と様々なエネルギーを科学的に探究するために必要な資質・能力を次のとおり育成することを目指す。
+
+（1）日常生活や社会との関連を図りながら、物体の運動と様々なエネルギーについて理解するとともに、科学的に探究するために必要な観察、実験などに関する基本的な技能を身に付けるようにする。
+
+（2）観察、実験などを行い、科学的に探究する力を養う。
+
+（3）物体の運動と様々なエネルギーに主体的に関わり、科学的に探究しようとする態度を養う。`,
     majorSections: [
       {
         majorSection: "物体の運動とエネルギー",
@@ -27,6 +34,13 @@ const SUBJECTS = [
   {
     subject: "physics",
     name: "物理",
+    objective: `物理的な事物・現象に関わり、理科の見方・考え方を働かせ、見通しをもって観察、実験を行うことなどを通して、物理的な事物・現象を科学的に探究するために必要な資質・能力を次のとおり育成することを目指す。
+
+（1）物理学の基本的な概念や原理・法則の理解を深め、科学的に探究するために必要な観察、実験などに関する技能を身に付けるようにする。
+
+（2）観察、実験などを行い、科学的に探究する力を養う。
+
+（3）物理的な事物・現象に主体的に関わり、科学的に探究しようとする態度を養う。`,
     majorSections: [
       {
         majorSection: "様々な運動",
@@ -85,6 +99,8 @@ const CRITERIA = [
 const subjectSelect = document.querySelector("#subject-select");
 const unitSelect = document.querySelector("#unit-select");
 const subitemsList = document.querySelector("#subitems-list");
+const subjectObjective = document.querySelector("#subject-objective");
+const copyObjectiveButton = document.querySelector("#copy-objective");
 const criteriaGrid = document.querySelector("#criteria-grid");
 const copyAllButton = document.querySelector("#copy-all");
 const toast = document.querySelector("#toast");
@@ -125,6 +141,7 @@ function populateUnits() {
 
 function render() {
   const unit = selectedUnit();
+  subjectObjective.textContent = selectedSubject().objective;
   subitemsList.replaceChildren(...unit.subItems.map((item) => {
     const li = document.createElement("li");
     li.textContent = item;
@@ -179,5 +196,6 @@ copyAllButton.addEventListener("click", () => {
   const combined = generatedCriteria().map(({ heading, text }) => `${heading}\n${text}`).join("\n\n");
   copyText(combined);
 });
+copyObjectiveButton.addEventListener("click", () => copyText(selectedSubject().objective));
 
 populateSubjects();
