@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="学習指導要領の項目から、物理基礎の3観点の評価規準を作成します。">
+    <title>理科 評価規準ジェネレーター</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="script.js" defer></script>
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="header-inner">
+        <p class="version">PHYSICS BASICS · v1.0</p>
+        <h1>理科 <span>評価規準ジェネレーター</span></h1>
+        <p class="subtitle">学習指導要領の項目から、3観点の評価規準を作成します。</p>
+      </div>
+    </header>
+
+    <main class="page-shell">
+      <section class="input-panel" aria-labelledby="input-heading">
+        <div class="section-heading">
+          <span class="step-number" aria-hidden="true">01</span>
+          <div>
+            <h2 id="input-heading">項目を選択</h2>
+            <p>科目と指導項目を選んでください。</p>
+          </div>
+        </div>
+
+        <div class="form-grid">
+          <label class="field">
+            <span>科目</span>
+            <select id="subject-select" aria-describedby="subject-note"></select>
+            <small id="subject-note">v1.0では物理基礎に対応しています</small>
+          </label>
+          <label class="field">
+            <span>指導項目</span>
+            <select id="unit-select"></select>
+          </label>
+        </div>
+
+        <div class="subitems-box" aria-live="polite">
+          <p class="subitems-label">学習指導要領上の小項目</p>
+          <ul id="subitems-list"></ul>
+        </div>
+      </section>
+
+      <section class="output-section" aria-labelledby="output-heading">
+        <div class="output-heading-row">
+          <div class="section-heading">
+            <span class="step-number" aria-hidden="true">02</span>
+            <div>
+              <h2 id="output-heading">評価規準</h2>
+              <p>選択した項目をもとに生成された3観点です。</p>
+            </div>
+          </div>
+          <button class="copy-all-button" id="copy-all" type="button">
+            <span aria-hidden="true">▣</span> 3観点をまとめてコピー
+          </button>
+        </div>
+
+        <div class="criteria-grid" id="criteria-grid"></div>
+      </section>
+    </main>
+
+    <div class="toast" id="toast" role="status" aria-live="polite">コピーしました</div>
+
+    <footer>
+      <p>物理基礎 v1.0　｜　入力内容や生成結果は保存されません</p>
+    </footer>
+  </body>
+</html>
