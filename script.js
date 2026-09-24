@@ -141,7 +141,11 @@ function populateUnits() {
 
 function render() {
   const unit = selectedUnit();
-  subjectObjective.textContent = selectedSubject().objective;
+  subjectObjective.replaceChildren(...selectedSubject().objective.split("\n\n").map((paragraph) => {
+    const p = document.createElement("p");
+    p.textContent = paragraph;
+    return p;
+  }));
   subitemsList.replaceChildren(...unit.subItems.map((item) => {
     const li = document.createElement("li");
     li.textContent = item;
