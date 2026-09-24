@@ -37,15 +37,14 @@
             <span>指導項目</span>
             <select id="unit-select"></select>
           </label>
-          <details class="objective-details">
-            <summary>科目の目標を見る</summary>
+          <section class="objective-card" aria-labelledby="objective-heading">
             <div class="objective-content">
-              <h3>科目の目標</h3>
-              <p id="subject-objective"></p>
+              <h3 id="objective-heading">科目の目標</h3>
+              <div id="subject-objective" class="objective-text"></div>
               <p class="objective-source">出典：高等学校学習指導要領（平成30年告示）</p>
               <button class="copy-button objective-copy-button" id="copy-objective" type="button">科目の目標をコピー</button>
             </div>
-          </details>
+          </section>
         </div>
 
         <div class="subitems-box" aria-live="polite">

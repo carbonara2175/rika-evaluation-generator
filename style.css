@@ -55,13 +55,13 @@ h1 span { font-weight: 500; }
 select { width: 100%; min-height: 48px; padding: 0 42px 0 14px; color: var(--ink); background: #fff; border: 1px solid #bcc9d2; border-radius: 6px; font: inherit; font-size: .98rem; cursor: pointer; }
 select:focus-visible, button:focus-visible { outline: 3px solid rgba(38, 113, 166, .28); outline-offset: 2px; }
 .field small { color: var(--muted); font-size: .74rem; }
-.objective-details { grid-column: 1 / -1; color: var(--ink); border: 1px solid #c9d9e4; border-radius: 7px; }
-.objective-details summary { padding: 10px 14px; color: var(--blue); background: #f7fafc; border-radius: inherit; font-size: .85rem; font-weight: 700; cursor: pointer; }
-.objective-details[open] summary { border-bottom: 1px solid #dbe5eb; border-radius: 7px 7px 0 0; }
-.objective-content { padding: 17px 18px 18px; }
-.objective-content h3 { margin: 0 0 10px; color: var(--navy); font-size: .95rem; }
-#subject-objective { margin: 0; white-space: pre-line; font-size: .84rem; line-height: 1.95; }
-.objective-source { margin: 13px 0 12px; color: var(--muted); font-size: .7rem; }
+.objective-card { grid-column: 1 / -1; color: var(--ink); background: #f8fbfd; border: 1px solid #c9d9e4; border-left: 4px solid #7eaeca; border-radius: 7px; }
+.objective-content { padding: 20px 22px 19px; }
+.objective-content h3 { margin: 0 0 15px; color: var(--navy); font-size: 1rem; }
+.objective-text { max-width: 88ch; }
+.objective-text p { margin: 0; font-size: .86rem; line-height: 2; }
+.objective-text p + p { margin-top: 13px; padding-top: 13px; border-top: 1px solid #dce7ed; }
+.objective-source { margin: 16px 0 13px; color: var(--muted); font-size: .72rem; }
 .objective-copy-button { display: block; margin-left: auto; }
 .subitems-box { margin-top: 25px; padding: 18px 22px; background: var(--blue-soft); border-left: 4px solid var(--blue); border-radius: 4px; }
 .subitems-label { margin: 0 0 7px; }
@@ -96,6 +96,8 @@ footer p { margin: 0; }
   .page-shell { padding-top: 24px; }
   .input-panel { padding: 22px 18px; }
   .form-grid, .criteria-grid { grid-template-columns: 1fr; }
+  .objective-content { padding: 18px 16px 17px; }
+  .objective-text p { line-height: 1.9; }
   .output-heading-row { align-items: stretch; flex-direction: column; }
   .copy-all-button { width: 100%; }
   .criterion-card { min-height: 0; }
