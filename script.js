@@ -478,12 +478,20 @@ function wordTemplateData() {
   const subject = planSubjectData();
   const unit = planUnitData();
   const plan = currentPlan();
+  const goals = unitGoals(unit);
+  const criteria = generatedCriteria(unit);
   return {
     subject: subject.name,
     unit: unit.unit,
     allocatedHours: plan.allocatedHours,
-    goals: unitGoals(unit).map((text, index) => ({ number: index + 1, text })),
-    criteria: generatedCriteria(unit).map(({ key, heading, text }) => ({ key, heading, text })),
+    goal1: goals[0] || "",
+    goal2: goals[1] || "",
+    goal3: goals[2] || "",
+    criteriaKnowledge: criteria.find(({ key }) => key === "knowledge")?.text || "",
+    criteriaThinking: criteria.find(({ key }) => key === "thinking")?.text || "",
+    criteriaAttitude: criteria.find(({ key }) => key === "attitude")?.text || "",
+    goals: goals.map((text, index) => ({ number: index + 1, text })),
+    criteria: criteria.map(({ key, heading, text }) => ({ key, heading, text })),
     lessons: plan.rows.map((row) => ({
       hour: row.hour,
       activity: row.activity || "－",
