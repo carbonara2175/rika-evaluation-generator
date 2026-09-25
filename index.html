@@ -12,7 +12,7 @@
   <body>
     <header class="site-header">
       <div class="header-inner">
-        <p class="version">SCIENCE PLANNING · v1.2</p>
+        <p class="version">SCIENCE PLANNING · v1.3</p>
         <h1>理科 <span>評価規準ジェネレーター</span></h1>
         <p class="subtitle">学習指導要領の項目から、3観点の評価規準を作成します。</p>
       </div>
@@ -22,6 +22,7 @@
       <div class="nav-inner" role="tablist">
         <button class="nav-tab active" id="criteria-tab" type="button" role="tab" aria-selected="true" aria-controls="criteria-view">評価規準</button>
         <button class="nav-tab" id="annual-tab" type="button" role="tab" aria-selected="false" aria-controls="annual-view">年間時数配分</button>
+        <button class="nav-tab" id="unit-plan-tab" type="button" role="tab" aria-selected="false" aria-controls="unit-plan-view">単元指導計画</button>
       </div>
     </nav>
 
@@ -114,12 +115,46 @@
           <div class="annual-actions"><button class="copy-all-button" id="copy-allocation" type="button">月別配当をコピー</button><button class="copy-all-button secondary" id="copy-annual-result" type="button">計算結果をまとめてコピー</button><button class="reset-button" id="reset-annual" type="button">入力をリセット</button></div>
         </section>
       </div>
+
+      <div id="unit-plan-view" role="tabpanel" aria-labelledby="unit-plan-tab" hidden>
+        <section class="annual-intro">
+          <p class="eyebrow">UNIT PLAN</p>
+          <h2>単元指導計画</h2>
+          <p>単元の目標と評価規準を確認し、各時間の指導と評価を計画します。</p>
+        </section>
+
+        <section class="input-panel unit-plan-settings" aria-labelledby="unit-settings-heading">
+          <div class="section-heading"><span class="step-number" aria-hidden="true">01</span><div><h2 id="unit-settings-heading">単元情報</h2><p>科目・単元・配当時数を設定してください。</p></div></div>
+          <div class="unit-settings-grid">
+            <label class="field"><span>科目</span><select id="plan-subject"></select></label>
+            <label class="field"><span>単元</span><select id="plan-unit"></select></label>
+            <label class="field hours-field"><span>配当時数</span><span class="number-with-unit"><input id="allocated-hours" type="number" min="1" step="1" value="8" inputmode="numeric"><small>時間</small></span></label>
+          </div>
+        </section>
+
+        <section class="unit-generated-block" aria-labelledby="unit-goals-heading">
+          <div class="section-heading"><span class="step-number" aria-hidden="true">02</span><div><h2 id="unit-goals-heading">単元の目標</h2><p>選択した中項目・小項目から自動生成します。</p></div></div>
+          <div class="generated-list" id="unit-goals"></div>
+        </section>
+
+        <section class="unit-generated-block" aria-labelledby="unit-criteria-heading">
+          <div class="section-heading"><span class="step-number" aria-hidden="true">03</span><div><h2 id="unit-criteria-heading">単元の評価規準</h2><p>評価規準機能と同じ生成ルールを利用しています。</p></div></div>
+          <div class="criteria-grid compact" id="unit-criteria"></div>
+        </section>
+
+        <section class="unit-plan-block" aria-labelledby="lesson-plan-heading">
+          <div class="plan-heading-row"><div class="section-heading"><span class="step-number" aria-hidden="true">04</span><div><h2 id="lesson-plan-heading">指導と評価の計画</h2><p>評価セルをクリックすると、空欄 → ○ → ◎ の順に切り替わります。</p></div></div><strong id="hours-progress">8 / 8時間</strong></div>
+          <div class="evaluation-legend" aria-label="評価記号の凡例"><span><b>○</b> 形成的評価</span><span><b>◎</b> 総括的評価（記録に残す評価）</span></div>
+          <div class="unit-table-wrap"><table class="unit-plan-table"><thead><tr><th>時間</th><th>学習活動（学習内容）</th><th>知</th><th>思</th><th>態</th><th>評価の観点及び方法</th></tr></thead><tbody id="lesson-rows"></tbody></table></div>
+          <div class="unit-plan-actions"><button class="copy-all-button" id="copy-unit-plan" type="button">単元指導計画をまとめてコピー</button><button class="reset-button" id="reset-unit-plan" type="button">この単元の入力をリセット</button></div>
+        </section>
+      </div>
     </main>
 
     <div class="toast" id="toast" role="status" aria-live="polite">コピーしました</div>
 
     <footer>
-      <p>物理基礎・物理 v1.2　｜　年間時数配分の入力はブラウザ内に保存されます</p>
+      <p>物理基礎・物理 v1.3　｜　年間時数配分・単元指導計画の入力はブラウザ内に保存されます</p>
     </footer>
   </body>
 </html>

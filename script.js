@@ -112,6 +112,8 @@ const criteriaTab = document.querySelector("#criteria-tab");
 const annualTab = document.querySelector("#annual-tab");
 const criteriaView = document.querySelector("#criteria-view");
 const annualView = document.querySelector("#annual-view");
+const unitPlanTab = document.querySelector("#unit-plan-tab");
+const unitPlanView = document.querySelector("#unit-plan-view");
 const annualSubject = document.querySelector("#annual-subject");
 const creditsInput = document.querySelector("#credits");
 const weeklyHoursInput = document.querySelector("#weekly-hours");
@@ -215,12 +217,16 @@ copyObjectiveButton.addEventListener("click", () => copyText(selectedSubject().o
 
 function selectView(view) {
   const showAnnual = view === "annual";
+  const showUnitPlan = view === "unit-plan";
   annualView.hidden = !showAnnual;
-  criteriaView.hidden = showAnnual;
+  unitPlanView.hidden = !showUnitPlan;
+  criteriaView.hidden = showAnnual || showUnitPlan;
   annualTab.classList.toggle("active", showAnnual);
-  criteriaTab.classList.toggle("active", !showAnnual);
+  unitPlanTab.classList.toggle("active", showUnitPlan);
+  criteriaTab.classList.toggle("active", !showAnnual && !showUnitPlan);
   annualTab.setAttribute("aria-selected", String(showAnnual));
-  criteriaTab.setAttribute("aria-selected", String(!showAnnual));
+  unitPlanTab.setAttribute("aria-selected", String(showUnitPlan));
+  criteriaTab.setAttribute("aria-selected", String(!showAnnual && !showUnitPlan));
 }
 
 function annualState() {
@@ -286,6 +292,7 @@ function initializeAnnual() {
 
 criteriaTab.addEventListener("click", () => selectView("criteria"));
 annualTab.addEventListener("click", () => selectView("annual"));
+unitPlanTab.addEventListener("click", () => selectView("unit-plan"));
 document.querySelector("#annual-view").addEventListener("input", renderAnnual);
 monthInputs.addEventListener("change", (event) => {
   if (event.target.matches("input")) event.target.value = Math.max(0, Math.trunc(Number(event.target.value) || 0));
@@ -308,3 +315,166 @@ document.querySelector("#reset-annual").addEventListener("click", () => {
 
 populateSubjects();
 initializeAnnual();
+
+const PLAN_SELECTION_KEY = "rika-unit-plan-selection-v1";
+const PLAN_STORAGE_PREFIX = "rika-unit-plan-v1:";
+const planSubject = document.querySelector("#plan-subject");
+const planUnit = document.querySelector("#plan-unit");
+const allocatedHoursInput = document.querySelector("#allocated-hours");
+const lessonRows = document.querySelector("#lesson-rows");
+const evaluationValues = ["", "formative", "summative"];
+
+function planSubjectData() {
+  return SUBJECTS.find(({ subject }) => subject === planSubject.value) || SUBJECTS[0];
+}
+
+function planUnits(subject = planSubjectData()) {
+  return subject.majorSections.flatMap(({ majorSection, units }) => units.map((unit) => ({ ...unit, majorSection })));
+}
+
+function planUnitData() {
+  return planUnits().find(({ id }) => id === planUnit.value) || planUnits()[0];
+}
+
+function planStorageKey() {
+  return `${PLAN_STORAGE_PREFIX}${planSubjectData().subject}__${planUnitData().id}`;
+}
+
+function blankLesson(hour) {
+  return { hour, activity: "", evaluation: { knowledge: "", thinking: "", attitude: "" }, method: "" };
+}
+
+function normalizedPlan(raw = {}) {
+  const allocatedHours = Math.max(1, Math.trunc(Number(raw.allocatedHours) || 8));
+  const rows = Array.from({ length: allocatedHours }, (_, index) => {
+    const saved = raw.rows?.[index] || {};
+    return { ...blankLesson(index + 1), ...saved, hour: index + 1, evaluation: { ...blankLesson(0).evaluation, ...saved.evaluation } };
+  });
+  return { subjectId: planSubjectData().subject, unitId: planUnitData().id, allocatedHours, rows };
+}
+
+function loadPlan() {
+  try { return normalizedPlan(JSON.parse(localStorage.getItem(planStorageKey())) || {}); }
+  catch { return normalizedPlan(); }
+}
+
+function currentPlan() {
+  const allocatedHours = Math.max(1, Math.trunc(Number(allocatedHoursInput.value) || 1));
+  const rows = [...lessonRows.querySelectorAll("tr")].map((row, index) => ({
+    hour: index + 1,
+    activity: row.querySelector('[data-field="activity"]').value,
+    evaluation: Object.fromEntries(["knowledge", "thinking", "attitude"].map((key) => [key, row.querySelector(`[data-evaluation="${key}"]`).dataset.value || ""])),
+    method: row.querySelector('[data-field="method"]').value
+  }));
+  return { subjectId: planSubjectData().subject, unitId: planUnitData().id, allocatedHours, rows };
+}
+
+function savePlan() {
+  try {
+    localStorage.setItem(planStorageKey(), JSON.stringify(currentPlan()));
+    localStorage.setItem(PLAN_SELECTION_KEY, JSON.stringify({ subjectId: planSubjectData().subject, unitId: planUnitData().id }));
+  } catch { /* Storage may be disabled by the browser. */ }
+}
+
+function evaluationMark(value) {
+  return value === "formative" ? "○" : value === "summative" ? "◎" : "";
+}
+
+function renderLessonRows(plan) {
+  lessonRows.replaceChildren(...plan.rows.map((lesson) => {
+    const row = document.createElement("tr");
+    row.innerHTML = `<th scope="row"><span>${lesson.hour}</span><small>時間目</small></th><td><label><span class="mobile-label">学習活動（学習内容）</span><textarea data-field="activity" rows="3" aria-label="${lesson.hour}時間目の学習活動"></textarea></label></td>${["knowledge", "thinking", "attitude"].map((key) => `<td class="evaluation-cell"><button type="button" class="evaluation-toggle" data-evaluation="${key}" data-value="${lesson.evaluation[key]}" aria-label="${lesson.hour}時間目の${key === "knowledge" ? "知識・技能" : key === "thinking" ? "思考・判断・表現" : "主体的態度"}の評価">${evaluationMark(lesson.evaluation[key])}</button></td>`).join("")}<td><label><span class="mobile-label">評価の観点及び方法</span><textarea data-field="method" rows="3" aria-label="${lesson.hour}時間目の評価の観点及び方法"></textarea></label></td>`;
+    row.querySelector('[data-field="activity"]').value = lesson.activity;
+    row.querySelector('[data-field="method"]').value = lesson.method;
+    return row;
+  }));
+  document.querySelector("#hours-progress").textContent = `${plan.rows.length} / ${plan.allocatedHours}時間`;
+}
+
+function unitGoals(unit = planUnitData()) {
+  return [
+    `${unit.unit}について、${unit.subItems.join("、")}を理解するとともに、それらの観察、実験などに関する技能を身に付けること。`,
+    `${unit.unit}について、観察、実験などを通して探究し、科学的に考察し、表現すること。`,
+    `${unit.unit}に主体的に関わり、科学的に探究しようとする態度を養うこと。`
+  ];
+}
+
+function renderUnitPlan() {
+  const unit = planUnitData();
+  const plan = loadPlan();
+  allocatedHoursInput.value = plan.allocatedHours;
+  document.querySelector("#unit-goals").replaceChildren(...unitGoals(unit).map((text, index) => {
+    const article = document.createElement("article");
+    article.innerHTML = `<strong>（${index + 1}）${["知識及び技能", "思考力・判断力・表現力等", "学びに向かう力、人間性等"][index]}</strong><p></p>`;
+    article.querySelector("p").textContent = text;
+    return article;
+  }));
+  document.querySelector("#unit-criteria").replaceChildren(...generatedCriteria(unit).map(({ heading, text }) => {
+    const article = document.createElement("article");
+    article.className = "criterion-card";
+    article.innerHTML = `<div class="card-accent" aria-hidden="true"></div><h3>${heading}</h3><p class="criterion-text"></p>`;
+    article.querySelector("p").textContent = text;
+    return article;
+  }));
+  renderLessonRows(plan);
+  savePlan();
+}
+
+function populatePlanUnits(preferredUnit) {
+  planUnit.replaceChildren(...planSubjectData().majorSections.map(({ majorSection, units }) => {
+    const group = document.createElement("optgroup");
+    group.label = majorSection;
+    group.replaceChildren(...units.map(({ id, unit }) => new Option(unit, id)));
+    return group;
+  }));
+  if (preferredUnit && planUnits().some(({ id }) => id === preferredUnit)) planUnit.value = preferredUnit;
+  renderUnitPlan();
+}
+
+function initializeUnitPlan() {
+  planSubject.replaceChildren(...SUBJECTS.map(({ subject, name }) => new Option(name, subject)));
+  let selection = {};
+  try { selection = JSON.parse(localStorage.getItem(PLAN_SELECTION_KEY)) || {}; } catch { /* Use defaults. */ }
+  if (SUBJECTS.some(({ subject }) => subject === selection.subjectId)) planSubject.value = selection.subjectId;
+  populatePlanUnits(selection.unitId);
+}
+
+planSubject.addEventListener("change", () => populatePlanUnits());
+planUnit.addEventListener("change", renderUnitPlan);
+allocatedHoursInput.addEventListener("change", () => {
+  const oldPlan = currentPlan();
+  oldPlan.allocatedHours = Math.max(1, Math.trunc(Number(allocatedHoursInput.value) || 1));
+  oldPlan.rows = Array.from({ length: oldPlan.allocatedHours }, (_, index) => oldPlan.rows[index] || blankLesson(index + 1));
+  allocatedHoursInput.value = oldPlan.allocatedHours;
+  renderLessonRows(oldPlan);
+  savePlan();
+});
+lessonRows.addEventListener("input", savePlan);
+lessonRows.addEventListener("click", (event) => {
+  const button = event.target.closest(".evaluation-toggle");
+  if (!button) return;
+  const next = evaluationValues[(evaluationValues.indexOf(button.dataset.value) + 1) % evaluationValues.length];
+  button.dataset.value = next;
+  button.textContent = evaluationMark(next);
+  button.classList.toggle("summative", next === "summative");
+  savePlan();
+});
+
+function unitPlanText() {
+  const subject = planSubjectData();
+  const unit = planUnitData();
+  const plan = currentPlan();
+  const goals = unitGoals(unit).map((text, index) => `（${index + 1}）\n${text}`).join("\n\n");
+  const criteria = generatedCriteria(unit).map(({ heading, text }) => `${heading}：\n${text}`).join("\n\n");
+  const lessons = plan.rows.map((row) => `${row.hour}時間目\n学習活動：\n${row.activity || "－"}\n\n知：${evaluationMark(row.evaluation.knowledge) || "－"}\n思：${evaluationMark(row.evaluation.thinking) || "－"}\n態：${evaluationMark(row.evaluation.attitude) || "－"}\n\n評価の観点及び方法：\n${row.method || "－"}`).join("\n\n---\n\n");
+  return `科目：${subject.name}\n単元名：${unit.unit}\n配当時数：${plan.allocatedHours}時間\n\n【単元の目標】\n\n${goals}\n\n【単元の評価規準】\n\n${criteria}\n\n【指導と評価の計画】\n\n${lessons}`;
+}
+
+document.querySelector("#copy-unit-plan").addEventListener("click", () => copyText(unitPlanText()));
+document.querySelector("#reset-unit-plan").addEventListener("click", () => {
+  if (!window.confirm("この単元の入力内容をリセットしますか？ほかの単元のデータは削除されません。")) return;
+  localStorage.removeItem(planStorageKey());
+  renderUnitPlan();
+});
+
+initializeUnitPlan();
