@@ -106,6 +106,17 @@ const copyAllButton = document.querySelector("#copy-all");
 const toast = document.querySelector("#toast");
 let toastTimer;
 
+const MONTHS = ["4月", "5月", "6月", "7月", "8月", "9月", "10月", "11月", "12月", "1月", "2月", "3月"];
+const ANNUAL_STORAGE_KEY = "rika-annual-hours-v1";
+const criteriaTab = document.querySelector("#criteria-tab");
+const annualTab = document.querySelector("#annual-tab");
+const criteriaView = document.querySelector("#criteria-view");
+const annualView = document.querySelector("#annual-view");
+const annualSubject = document.querySelector("#annual-subject");
+const creditsInput = document.querySelector("#credits");
+const weeklyHoursInput = document.querySelector("#weekly-hours");
+const monthInputs = document.querySelector("#month-inputs");
+
 function selectedSubject() {
   return SUBJECTS.find(({ subject }) => subject === subjectSelect.value) || SUBJECTS[0];
 }
@@ -202,4 +213,98 @@ copyAllButton.addEventListener("click", () => {
 });
 copyObjectiveButton.addEventListener("click", () => copyText(selectedSubject().objective));
 
+function selectView(view) {
+  const showAnnual = view === "annual";
+  annualView.hidden = !showAnnual;
+  criteriaView.hidden = showAnnual;
+  annualTab.classList.toggle("active", showAnnual);
+  criteriaTab.classList.toggle("active", !showAnnual);
+  annualTab.setAttribute("aria-selected", String(showAnnual));
+  criteriaTab.setAttribute("aria-selected", String(!showAnnual));
+}
+
+function annualState() {
+  return {
+    subject: annualSubject.value,
+    credits: Math.min(10, Math.max(1, Math.trunc(Number(creditsInput.value) || 1))),
+    weeklyHours: Math.max(0, Number(weeklyHoursInput.value) || 0),
+    days: [...monthInputs.querySelectorAll("input")].map((input) => Math.max(0, Math.trunc(Number(input.value) || 0)))
+  };
+}
+
+function saveAnnualState(state) {
+  try { localStorage.setItem(ANNUAL_STORAGE_KEY, JSON.stringify(state)); } catch { /* Storage may be disabled by the browser. */ }
+}
+
+function renderAnnual() {
+  const state = annualState();
+  const annualHours = calculateAnnualHours(state.credits);
+  const totalDays = state.days.reduce((sum, value) => sum + value, 0);
+  const expected = calculateExpectedHours(totalDays, state.weeklyHours);
+  const allocations = allocateByLargestRemainder(annualHours, state.days);
+  const allocated = allocations.reduce((sum, value) => sum + value, 0);
+  document.querySelector("#standard-hours").value = `${annualHours}時間`;
+  document.querySelector("#summary-standard").textContent = `${annualHours}時間`;
+  document.querySelector("#summary-days").textContent = `${totalDays}日`;
+  document.querySelector("#summary-expected").textContent = `${expected.toFixed(1)}時間`;
+  document.querySelector("#summary-rounded").textContent = `（約${Math.round(expected)}時間）`;
+  document.querySelector("#summary-allocation").textContent = `${allocated} / ${annualHours}時間`;
+  document.querySelector("#annual-table-body").replaceChildren(...MONTHS.map((month, index) => {
+    const row = document.createElement("tr");
+    row.innerHTML = `<th scope="row">${month}</th><td>${state.days[index]}日</td><td>${calculateExpectedHours(state.days[index], state.weeklyHours).toFixed(1)}h</td><td><strong>${allocations[index]}h</strong></td>`;
+    return row;
+  }));
+  document.querySelector("#annual-table-foot").innerHTML = `<tr><th scope="row">合計</th><td>${totalDays}日</td><td>${expected.toFixed(1)}h</td><td>${allocated}h</td></tr>`;
+  saveAnnualState(state);
+}
+
+function allocationText() {
+  const state = annualState();
+  const annualHours = calculateAnnualHours(state.credits);
+  const allocations = allocateByLargestRemainder(annualHours, state.days);
+  return `${MONTHS.map((month, index) => `${month}：${allocations[index]}時間`).join("\n")}\n\n合計：${allocations.reduce((sum, value) => sum + value, 0)}時間`;
+}
+
+function initializeAnnual() {
+  monthInputs.replaceChildren(...MONTHS.map((month, index) => {
+    const label = document.createElement("label");
+    label.className = "month-field";
+    label.innerHTML = `<span>${month}</span><span class="number-with-unit"><input type="number" min="0" step="1" inputmode="numeric" data-month="${index}" value="0" aria-label="${month}の授業可能日数"><small>日</small></span>`;
+    return label;
+  }));
+  try {
+    const saved = JSON.parse(localStorage.getItem(ANNUAL_STORAGE_KEY));
+    if (saved) {
+      annualSubject.value = saved.subject || "";
+      creditsInput.value = saved.credits || 2;
+      weeklyHoursInput.value = saved.weeklyHours ?? saved.credits ?? 2;
+      [...monthInputs.querySelectorAll("input")].forEach((input, index) => { input.value = saved.days?.[index] ?? 0; });
+    }
+  } catch { localStorage.removeItem(ANNUAL_STORAGE_KEY); }
+  renderAnnual();
+}
+
+criteriaTab.addEventListener("click", () => selectView("criteria"));
+annualTab.addEventListener("click", () => selectView("annual"));
+document.querySelector("#annual-view").addEventListener("input", renderAnnual);
+monthInputs.addEventListener("change", (event) => {
+  if (event.target.matches("input")) event.target.value = Math.max(0, Math.trunc(Number(event.target.value) || 0));
+  renderAnnual();
+});
+creditsInput.addEventListener("change", () => { weeklyHoursInput.value = creditsInput.value; renderAnnual(); });
+document.querySelector("#copy-allocation").addEventListener("click", () => copyText(allocationText()));
+document.querySelector("#copy-annual-result").addEventListener("click", () => {
+  const state = annualState();
+  const annualHours = calculateAnnualHours(state.credits);
+  const totalDays = state.days.reduce((sum, value) => sum + value, 0);
+  copyText(`科目：${state.subject || "未入力"}\n単位数：${state.credits}単位\n標準年間時数：${annualHours}時間\n授業可能日数：${totalDays}日\n実働見込み：${calculateExpectedHours(totalDays, state.weeklyHours).toFixed(1)}時間（約${Math.round(calculateExpectedHours(totalDays, state.weeklyHours))}時間）\n\n月別配当\n${allocationText()}`);
+});
+document.querySelector("#reset-annual").addEventListener("click", () => {
+  localStorage.removeItem(ANNUAL_STORAGE_KEY);
+  annualSubject.value = ""; creditsInput.value = 2; weeklyHoursInput.value = 2;
+  monthInputs.querySelectorAll("input").forEach((input) => { input.value = 0; });
+  renderAnnual();
+});
+
 populateSubjects();
+initializeAnnual();

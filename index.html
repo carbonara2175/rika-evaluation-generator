@@ -6,18 +6,27 @@
     <meta name="description" content="学習指導要領の項目から、物理基礎・物理の3観点の評価規準を作成します。">
     <title>理科 評価規準ジェネレーター</title>
     <link rel="stylesheet" href="style.css">
+    <script src="annual-hours.js" defer></script>
     <script src="script.js" defer></script>
   </head>
   <body>
     <header class="site-header">
       <div class="header-inner">
-        <p class="version">SCIENCE EVALUATION · v1.1</p>
+        <p class="version">SCIENCE PLANNING · v1.2</p>
         <h1>理科 <span>評価規準ジェネレーター</span></h1>
         <p class="subtitle">学習指導要領の項目から、3観点の評価規準を作成します。</p>
       </div>
     </header>
 
+    <nav class="app-nav" aria-label="機能の切り替え">
+      <div class="nav-inner" role="tablist">
+        <button class="nav-tab active" id="criteria-tab" type="button" role="tab" aria-selected="true" aria-controls="criteria-view">評価規準</button>
+        <button class="nav-tab" id="annual-tab" type="button" role="tab" aria-selected="false" aria-controls="annual-view">年間時数配分</button>
+      </div>
+    </nav>
+
     <main class="page-shell">
+      <div id="criteria-view" role="tabpanel" aria-labelledby="criteria-tab">
       <section class="input-panel" aria-labelledby="input-heading">
         <div class="section-heading">
           <span class="step-number" aria-hidden="true">01</span>
@@ -69,12 +78,48 @@
 
         <div class="criteria-grid" id="criteria-grid"></div>
       </section>
+      </div>
+
+      <div id="annual-view" role="tabpanel" aria-labelledby="annual-tab" hidden>
+        <section class="annual-intro">
+          <p class="eyebrow">ANNUAL HOURS</p>
+          <h2>年間時数配分</h2>
+          <p>各月の授業可能日数から、実働時数の見込みと年間指導計画上の配当時数を計算します。</p>
+        </section>
+
+        <section class="input-panel annual-settings" aria-labelledby="settings-heading">
+          <div class="section-heading"><span class="step-number" aria-hidden="true">01</span><div><h2 id="settings-heading">基本設定</h2><p>科目と授業時数を設定してください。</p></div></div>
+          <div class="annual-form-grid">
+            <label class="field"><span>科目名</span><input id="annual-subject" type="text" list="annual-subjects" placeholder="例：物理基礎"><datalist id="annual-subjects"><option value="物理基礎"></option><option value="物理"></option></datalist></label>
+            <label class="field"><span>単位数</span><input id="credits" type="number" min="1" max="10" step="1" value="2"></label>
+            <div class="field readonly-field"><span>標準年間時数</span><output id="standard-hours">70時間</output><small>単位数 × 35単位時間</small></div>
+            <label class="field"><span>週授業時数</span><input id="weekly-hours" type="number" min="0" max="50" step="0.1" value="2"></label>
+          </div>
+        </section>
+
+        <section class="input-panel monthly-panel" aria-labelledby="monthly-heading">
+          <div class="section-heading"><span class="step-number" aria-hidden="true">02</span><div><h2 id="monthly-heading">月別授業可能日数</h2><p>年間行事予定から数えた日数を入力してください。</p></div></div>
+          <div class="month-input-grid" id="month-inputs"></div>
+        </section>
+
+        <section class="annual-results" aria-labelledby="results-heading">
+          <div class="output-heading-row"><div class="section-heading"><span class="step-number" aria-hidden="true">03</span><div><h2 id="results-heading">計算結果</h2><p>実働見込みは、曜日未確定段階での概算です。</p></div></div></div>
+          <div class="summary-grid">
+            <article><span>標準年間時数</span><strong id="summary-standard">70時間</strong></article>
+            <article><span>授業可能日数</span><strong id="summary-days">0日</strong></article>
+            <article class="expected-card"><span>実働見込み</span><strong id="summary-expected">0.0時間</strong><small id="summary-rounded">（約0時間）</small></article>
+            <article><span>年計上の配当</span><strong id="summary-allocation">0 / 70時間</strong></article>
+          </div>
+          <div class="result-table-wrap"><table><thead><tr><th>月</th><th>授業可能日</th><th>実働見込み</th><th>年計上の配当</th></tr></thead><tbody id="annual-table-body"></tbody><tfoot id="annual-table-foot"></tfoot></table></div>
+          <div class="annual-actions"><button class="copy-all-button" id="copy-allocation" type="button">月別配当をコピー</button><button class="copy-all-button secondary" id="copy-annual-result" type="button">計算結果をまとめてコピー</button><button class="reset-button" id="reset-annual" type="button">入力をリセット</button></div>
+        </section>
+      </div>
     </main>
 
     <div class="toast" id="toast" role="status" aria-live="polite">コピーしました</div>
 
     <footer>
-      <p>物理基礎・物理 v1.1　｜　入力内容や生成結果は保存されません</p>
+      <p>物理基礎・物理 v1.2　｜　年間時数配分の入力はブラウザ内に保存されます</p>
     </footer>
   </body>
 </html>
