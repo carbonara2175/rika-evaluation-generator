@@ -6,6 +6,8 @@
     <meta name="description" content="学習指導要領の項目から、物理基礎・物理の3観点の評価規準を作成します。">
     <title>理科 評価規準ジェネレーター</title>
     <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/pizzip@3.2.0/dist/pizzip.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/docxtemplater@3.62.0/build/docxtemplater.js" defer></script>
     <script src="annual-hours.js" defer></script>
     <script src="script.js" defer></script>
   </head>
@@ -146,7 +148,7 @@
           <div class="plan-heading-row"><div class="section-heading"><span class="step-number" aria-hidden="true">04</span><div><h2 id="lesson-plan-heading">指導と評価の計画</h2><p>評価セルをクリックすると、空欄 → ○ → ◎ の順に切り替わります。</p></div></div><strong id="hours-progress">8 / 8時間</strong></div>
           <div class="evaluation-legend" aria-label="評価記号の凡例"><span><b>○</b> 形成的評価</span><span><b>◎</b> 総括的評価（記録に残す評価）</span></div>
           <div class="unit-table-wrap"><table class="unit-plan-table"><thead><tr><th>時間</th><th>学習活動（学習内容）</th><th>知</th><th>思</th><th>態</th><th>評価の観点及び方法</th></tr></thead><tbody id="lesson-rows"></tbody></table></div>
-          <div class="unit-plan-actions"><button class="copy-all-button" id="copy-unit-plan" type="button">単元指導計画をまとめてコピー</button><button class="reset-button" id="reset-unit-plan" type="button">この単元の入力をリセット</button></div>
+          <div class="unit-plan-actions"><button class="copy-all-button" id="export-unit-plan-word" type="button">Word形式で出力</button><button class="copy-all-button secondary" id="copy-unit-plan" type="button">単元指導計画をまとめてコピー</button><button class="reset-button" id="reset-unit-plan" type="button">この単元の入力をリセット</button></div>
         </section>
       </div>
     </main>
