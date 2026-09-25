@@ -195,8 +195,10 @@ async function copyText(text) {
   showToast();
 }
 
-function showToast() {
+function showToast(message = "コピーしました", isError = false) {
   window.clearTimeout(toastTimer);
+  toast.textContent = message;
+  toast.classList.toggle("error", isError);
   toast.classList.add("show");
   toastTimer = window.setTimeout(() => toast.classList.remove("show"), 1800);
 }
@@ -470,7 +472,67 @@ function unitPlanText() {
   return `科目：${subject.name}\n単元名：${unit.unit}\n配当時数：${plan.allocatedHours}時間\n\n【単元の目標】\n\n${goals}\n\n【単元の評価規準】\n\n${criteria}\n\n【指導と評価の計画】\n\n${lessons}`;
 }
 
+const UNIT_PLAN_TEMPLATE_PATH = "public/templates/unit-plan-template.docx";
+
+function wordTemplateData() {
+  const subject = planSubjectData();
+  const unit = planUnitData();
+  const plan = currentPlan();
+  return {
+    subject: subject.name,
+    unit: unit.unit,
+    allocatedHours: plan.allocatedHours,
+    goals: unitGoals(unit).map((text, index) => ({ number: index + 1, text })),
+    criteria: generatedCriteria(unit).map(({ key, heading, text }) => ({ key, heading, text })),
+    lessons: plan.rows.map((row) => ({
+      hour: row.hour,
+      activity: row.activity || "－",
+      knowledge: evaluationMark(row.evaluation.knowledge) || "－",
+      thinking: evaluationMark(row.evaluation.thinking) || "－",
+      attitude: evaluationMark(row.evaluation.attitude) || "－",
+      method: row.method || "－"
+    }))
+  };
+}
+
+async function exportUnitPlanWord() {
+  const button = document.querySelector("#export-unit-plan-word");
+  button.disabled = true;
+  try {
+    const response = await fetch(UNIT_PLAN_TEMPLATE_PATH);
+    if (!response.ok) throw new Error(`Template request failed: ${response.status}`);
+    if (typeof PizZip === "undefined" || typeof docxtemplater === "undefined") {
+      throw new Error("Word export libraries are unavailable");
+    }
+    const template = await response.arrayBuffer();
+    const documentTemplate = new docxtemplater(new PizZip(template), {
+      paragraphLoop: true,
+      linebreaks: true
+    });
+    documentTemplate.render(wordTemplateData());
+    const blob = documentTemplate.getZip().generate({
+      type: "blob",
+      mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    });
+    const downloadUrl = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = downloadUrl;
+    link.download = `${planSubjectData().name}_${planUnitData().unit}_単元指導計画.docx`;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(downloadUrl);
+    showToast("Wordファイルを出力しました");
+  } catch (error) {
+    console.error("Word export failed", error);
+    showToast("Wordテンプレートを読み込めませんでした", true);
+  } finally {
+    button.disabled = false;
+  }
+}
+
 document.querySelector("#copy-unit-plan").addEventListener("click", () => copyText(unitPlanText()));
+document.querySelector("#export-unit-plan-word").addEventListener("click", exportUnitPlanWord);
 document.querySelector("#reset-unit-plan").addEventListener("click", () => {
   if (!window.confirm("この単元の入力内容をリセットしますか？ほかの単元のデータは削除されません。")) return;
   localStorage.removeItem(planStorageKey());
