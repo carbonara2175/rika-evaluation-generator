@@ -10,7 +10,7 @@ Word出力機能を利用するには、次のテンプレートをこのディ�
 
 ## テンプレートで使用できるデータ
 
-docxtemplaterのタグとして、科目名 `{subject}`、単元名 `{unit}`、配当時数 `{allocatedHours}` を使用できます。さらに、`goals`、`criteria`、`lessons` の各配列をループとして使用できます。
+docxtemplaterのタグとして、所属 `{affiliation}`、氏名 `{teacherName}`、科目名 `{subject}`、単元名 `{unit}`、配当時数 `{allocatedHours}` を使用できます。さらに、`goals`、`criteria`、`lessons` の各配列をループとして使用できます。
 
 - `goals`：`number`、`text`
 - `criteria`：`key`、`heading`、`text`
