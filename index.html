@@ -5,11 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="学習指導要領の項目から、物理基礎・物理の3観点の評価規準を作成します。">
     <title>理科 評価規準ジェネレーター</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=1.3.2">
     <script src="https://cdn.jsdelivr.net/npm/pizzip@3.2.0/dist/pizzip.min.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/docxtemplater@3.62.0/build/docxtemplater.js" defer></script>
     <script src="annual-hours.js?v=1.3.1" defer></script>
-    <script src="script.js?v=1.3.1" defer></script>
+    <script src="script.js?v=1.3.2" defer></script>
   </head>
   <body>
     <header class="site-header">
@@ -126,10 +126,12 @@
         </section>
 
         <section class="input-panel unit-plan-settings" aria-labelledby="unit-settings-heading">
-          <div class="section-heading"><span class="step-number" aria-hidden="true">01</span><div><h2 id="unit-settings-heading">単元情報</h2><p>科目・単元・配当時数を設定してください。</p></div></div>
+          <div class="section-heading"><span class="step-number" aria-hidden="true">01</span><div><h2 id="unit-settings-heading">単元情報</h2><p>所属・氏名・科目・単元・配当時数を設定してください。</p></div></div>
           <div class="unit-settings-grid">
-            <label class="field"><span>科目</span><select id="plan-subject"></select></label>
-            <label class="field"><span>単元</span><select id="plan-unit"></select></label>
+            <label class="field user-info-field"><span>所属</span><input id="affiliation" type="text" autocomplete="organization" placeholder="例：青森高等学校"></label>
+            <label class="field user-info-field"><span>氏名</span><input id="teacher-name" type="text" autocomplete="name" placeholder="例：成田 翔"></label>
+            <label class="field subject-field"><span>科目</span><select id="plan-subject"></select></label>
+            <label class="field unit-field"><span>単元</span><select id="plan-unit"></select></label>
             <label class="field hours-field"><span>配当時数</span><span class="number-with-unit"><input id="allocated-hours" type="number" min="1" step="1" value="8" inputmode="numeric"><small>時間</small></span></label>
           </div>
         </section>

@@ -320,9 +320,12 @@ initializeAnnual();
 
 const PLAN_SELECTION_KEY = "rika-unit-plan-selection-v1";
 const PLAN_STORAGE_PREFIX = "rika-unit-plan-v1:";
+const PLAN_USER_INFO_KEY = "rika-unit-plan-user-info-v1";
 const planSubject = document.querySelector("#plan-subject");
 const planUnit = document.querySelector("#plan-unit");
 const allocatedHoursInput = document.querySelector("#allocated-hours");
+const affiliationInput = document.querySelector("#affiliation");
+const teacherNameInput = document.querySelector("#teacher-name");
 const lessonRows = document.querySelector("#lesson-rows");
 const evaluationValues = ["", "formative", "summative"];
 
@@ -376,6 +379,26 @@ function savePlan() {
     localStorage.setItem(planStorageKey(), JSON.stringify(currentPlan()));
     localStorage.setItem(PLAN_SELECTION_KEY, JSON.stringify({ subjectId: planSubjectData().subject, unitId: planUnitData().id }));
   } catch { /* Storage may be disabled by the browser. */ }
+}
+
+function userInfo() {
+  return { affiliation: affiliationInput.value, teacherName: teacherNameInput.value };
+}
+
+function loadUserInfo() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(PLAN_USER_INFO_KEY)) || {};
+    affiliationInput.value = typeof saved.affiliation === "string" ? saved.affiliation : "";
+    teacherNameInput.value = typeof saved.teacherName === "string" ? saved.teacherName : "";
+  } catch {
+    affiliationInput.value = "";
+    teacherNameInput.value = "";
+  }
+}
+
+function saveUserInfo() {
+  try { localStorage.setItem(PLAN_USER_INFO_KEY, JSON.stringify(userInfo())); }
+  catch { /* Storage may be disabled by the browser. */ }
 }
 
 function evaluationMark(value) {
@@ -434,6 +457,7 @@ function populatePlanUnits(preferredUnit) {
 }
 
 function initializeUnitPlan() {
+  loadUserInfo();
   planSubject.replaceChildren(...SUBJECTS.map(({ subject, name }) => new Option(name, subject)));
   let selection = {};
   try { selection = JSON.parse(localStorage.getItem(PLAN_SELECTION_KEY)) || {}; } catch { /* Use defaults. */ }
@@ -443,6 +467,8 @@ function initializeUnitPlan() {
 
 planSubject.addEventListener("change", () => populatePlanUnits());
 planUnit.addEventListener("change", renderUnitPlan);
+affiliationInput.addEventListener("input", saveUserInfo);
+teacherNameInput.addEventListener("input", saveUserInfo);
 allocatedHoursInput.addEventListener("change", () => {
   const oldPlan = currentPlan();
   oldPlan.allocatedHours = Math.max(1, Math.trunc(Number(allocatedHoursInput.value) || 1));
@@ -469,7 +495,9 @@ function unitPlanText() {
   const goals = unitGoals(unit).map((text, index) => `（${index + 1}）\n${text}`).join("\n\n");
   const criteria = generatedCriteria(unit).map(({ heading, text }) => `${heading}：\n${text}`).join("\n\n");
   const lessons = plan.rows.map((row) => `${row.hour}時間目\n学習活動：\n${row.activity || "－"}\n\n知：${evaluationMark(row.evaluation.knowledge) || "－"}\n思：${evaluationMark(row.evaluation.thinking) || "－"}\n態：${evaluationMark(row.evaluation.attitude) || "－"}\n\n評価の観点及び方法：\n${row.method || "－"}`).join("\n\n---\n\n");
-  return `科目：${subject.name}\n単元名：${unit.unit}\n配当時数：${plan.allocatedHours}時間\n\n【単元の目標】\n\n${goals}\n\n【単元の評価規準】\n\n${criteria}\n\n【指導と評価の計画】\n\n${lessons}`;
+  const info = userInfo();
+  const userInfoText = [info.affiliation && `所属：${info.affiliation}`, info.teacherName && `氏名：${info.teacherName}`].filter(Boolean);
+  return `${userInfoText.length ? `${userInfoText.join("\n")}\n` : ""}科目：${subject.name}\n単元名：${unit.unit}\n配当時数：${plan.allocatedHours}時間\n\n【単元の目標】\n\n${goals}\n\n【単元の評価規準】\n\n${criteria}\n\n【指導と評価の計画】\n\n${lessons}`;
 }
 
 const UNIT_PLAN_TEMPLATE_PATH = "public/templates/unit-plan-template.docx";
@@ -480,7 +508,10 @@ function wordTemplateData() {
   const plan = currentPlan();
   const goals = unitGoals(unit);
   const criteria = generatedCriteria(unit);
+  const info = userInfo();
   return {
+    affiliation: info.affiliation,
+    teacherName: info.teacherName,
     subject: subject.name,
     unit: unit.unit,
     allocatedHours: plan.allocatedHours,
@@ -495,9 +526,9 @@ function wordTemplateData() {
     lessons: plan.rows.map((row) => ({
       hour: row.hour,
       activity: row.activity || "－",
-      knowledge: evaluationMark(row.evaluation.knowledge) || "－",
-      thinking: evaluationMark(row.evaluation.thinking) || "－",
-      attitude: evaluationMark(row.evaluation.attitude) || "－",
+      knowledge: evaluationMark(row.evaluation.knowledge) || "",
+      thinking: evaluationMark(row.evaluation.thinking) || "",
+      attitude: evaluationMark(row.evaluation.attitude) || "",
       method: row.method || "－"
     }))
   };
