@@ -103,7 +103,8 @@ footer p { margin: 0; }
 .annual-intro p:not(.eyebrow) { margin: 4px 0 0; color: var(--muted); }
 .eyebrow { margin: 0 0 2px; color: var(--blue); font: 700 .7rem Arial, sans-serif; letter-spacing: .16em; }
 .annual-settings { margin-bottom: 20px; }
-.annual-form-grid { display: grid; grid-template-columns: 1.4fr repeat(3, 1fr); gap: 20px; margin-top: 24px; }
+.annual-form-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; margin-top: 24px; }
+.custom-annual-field[hidden] { display: none; }
 .readonly-field output { display: flex; min-height: 48px; padding: 0 14px; align-items: center; color: var(--navy); background: var(--blue-soft); border: 1px solid #c9d9e4; border-radius: 6px; font-size: 1.05rem; font-weight: 700; }
 .monthly-panel { margin-top: 20px; }
 .month-input-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px 20px; margin-top: 24px; }
