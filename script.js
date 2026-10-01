@@ -243,6 +243,7 @@ function selectView(view) {
   annualTab.setAttribute("aria-selected", String(showAnnual));
   unitPlanTab.setAttribute("aria-selected", String(showUnitPlan));
   criteriaTab.setAttribute("aria-selected", String(!showAnnual && !showUnitPlan));
+  if (showAnnual) renderAnnual();
 }
 
 function stableCustomId(value, fallback) {
@@ -272,6 +273,8 @@ function annualPreset() {
 }
 
 function annualState() {
+  const { schoolId, courseId } = annualIds();
+  const actualHours = unitHoursTotal(schoolId, courseId);
   return {
     schoolId: annualSchool.value,
     courseId: annualSubject.value,
@@ -279,7 +282,7 @@ function annualState() {
     courseName: annualSchool.value === "other" ? customSubjectName.value.trim() : annualPreset().name,
     credits: Math.min(10, Math.max(1, Math.trunc(Number(creditsInput.value) || 1))),
     weeklyHours: Math.max(0, Number(weeklyHoursInput.value) || 0),
-    actualHours: Math.max(0, Number(actualHoursInput.value) || 0),
+    actualHours,
     days: [...monthInputs.querySelectorAll("input")].map((input) => Math.max(0, Math.trunc(Number(input.value) || 0)))
   };
 }
@@ -311,7 +314,6 @@ function applyAnnualState(resetToPreset = false) {
   const saved = resetToPreset ? null : loadStoredAnnualState();
   creditsInput.value = saved?.credits ?? preset.credits;
   weeklyHoursInput.value = saved?.weeklyHours ?? preset.weeklyHours;
-  actualHoursInput.value = saved?.actualHours ?? calculateAnnualHours(saved?.credits ?? preset.credits);
   [...monthInputs.querySelectorAll("input")].forEach((input, index) => { input.value = saved?.days?.[index] ?? 0; });
 }
 
@@ -322,8 +324,12 @@ function renderAnnual() {
   const expected = calculateExpectedHours(totalDays, state.weeklyHours);
   const allocations = allocateByLargestRemainder(annualHours, state.days);
   const allocated = allocations.reduce((sum, value) => sum + value, 0);
+  const marginHours = annualHours - state.actualHours;
   document.querySelector("#standard-hours").value = `${annualHours}時間`;
+  actualHoursInput.value = `${state.actualHours}時間`;
   document.querySelector("#summary-standard").textContent = `${annualHours}時間`;
+  document.querySelector("#summary-actual").textContent = `${state.actualHours}時間`;
+  document.querySelector("#summary-margin").textContent = `${marginHours}時間`;
   document.querySelector("#summary-days").textContent = `${totalDays}日`;
   document.querySelector("#summary-expected").textContent = `${expected.toFixed(1)}時間`;
   document.querySelector("#summary-rounded").textContent = `（約${Math.round(expected)}時間）`;
@@ -391,7 +397,7 @@ annualTab.addEventListener("click", () => selectView("annual"));
 unitPlanTab.addEventListener("click", () => selectView("unit-plan"));
 annualSchool.addEventListener("change", () => { populateAnnualCourses(); applyAnnualState(); renderAnnual(); });
 annualSubject.addEventListener("change", () => { applyAnnualState(); renderAnnual(); });
-[creditsInput, weeklyHoursInput, actualHoursInput, customSchoolName, customSubjectName].forEach((input) => input.addEventListener("input", renderAnnual));
+[creditsInput, weeklyHoursInput, customSchoolName, customSubjectName].forEach((input) => input.addEventListener("input", renderAnnual));
 monthInputs.addEventListener("input", renderAnnual);
 monthInputs.addEventListener("change", (event) => {
   if (event.target.matches("input")) event.target.value = Math.max(0, Math.trunc(Number(event.target.value) || 0));
@@ -409,9 +415,6 @@ document.querySelector("#reset-annual").addEventListener("click", () => {
   applyAnnualState(true);
   renderAnnual();
 });
-
-populateSubjects();
-initializeAnnual();
 
 // Courses and units deliberately live below each school. In particular, the two
 // inquiry-physics entries are independent even though their display names match.
@@ -460,6 +463,24 @@ function planStorageKey() {
   return `${PLAN_STORAGE_PREFIX}${planSchool.value}__${planSubject.value}__${planUnitData().id}`;
 }
 
+function unitHoursTotal(schoolId, courseId) {
+  const prefix = `${PLAN_STORAGE_PREFIX}${schoolId}__${courseId}__`;
+  const plans = [];
+  try {
+    for (let index = 0; index < localStorage.length; index += 1) {
+      const key = localStorage.key(index);
+      if (!key?.startsWith(prefix)) continue;
+      try { plans.push(JSON.parse(localStorage.getItem(key))); }
+      catch { /* Ignore only the invalid entry; keep all other saved plans. */ }
+    }
+  } catch { /* Storage may be disabled by the browser. */ }
+  return calculateUnitHoursTotal(plans);
+}
+
+function renderUnitHoursTotal() {
+  document.querySelector("#unit-total-hours").textContent = `${unitHoursTotal(planSchool.value, planSubject.value)}時間`;
+}
+
 function blankLesson(hour) {
   return { hour, activity: "", evaluation: { knowledge: "", thinking: "", attitude: "" }, method: "" };
 }
@@ -495,6 +516,7 @@ function savePlan() {
     localStorage.setItem(PLAN_SELECTION_KEY, JSON.stringify({ schoolId: planSchool.value, courseId: planSubject.value, unitId: planUnitData().id, unitName: planUnitData().unit }));
     localStorage.setItem(`${PLAN_LAST_UNIT_PREFIX}${planSchool.value}__${planSubject.value}`, JSON.stringify({ unitId: planUnitData().id, unitName: planUnitData().unit }));
   } catch { /* Storage may be disabled by the browser. */ }
+  renderUnitHoursTotal();
 }
 
 function userInfo() {
@@ -558,7 +580,7 @@ function renderUnitPlan() {
     return article;
   }));
   renderLessonRows(plan);
-  savePlan();
+  renderUnitHoursTotal();
 }
 
 function populatePlanUnits(preferredUnit) {
@@ -736,3 +758,5 @@ document.querySelector("#reset-unit-plan").addEventListener("click", () => {
 });
 
 initializeUnitPlan();
+populateSubjects();
+initializeAnnual();

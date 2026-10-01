@@ -25,4 +25,8 @@ function allocateByLargestRemainder(annualHours, availableDays) {
   return availableDays.some((value) => Number(value) > 0) ? allocation : allocation.map(() => 0);
 }
 
-if (typeof module !== "undefined") module.exports = { calculateAnnualHours, calculateExpectedHours, calculateProportionalAllocation, allocateByLargestRemainder };
+function calculateUnitHoursTotal(plans) {
+  return plans.reduce((total, plan) => total + Math.max(0, Math.trunc(Number(plan?.allocatedHours) || 0)), 0);
+}
+
+if (typeof module !== "undefined") module.exports = { calculateAnnualHours, calculateExpectedHours, calculateProportionalAllocation, allocateByLargestRemainder, calculateUnitHoursTotal };

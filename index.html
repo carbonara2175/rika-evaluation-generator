@@ -5,16 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="学習指導要領の項目から、物理基礎・物理の3観点の評価規準を作成します。">
     <title>理科 評価規準ジェネレーター</title>
-    <link rel="stylesheet" href="style.css?v=1.4.0">
+    <link rel="stylesheet" href="style.css?v=1.5.0">
     <script src="https://cdn.jsdelivr.net/npm/pizzip@3.2.0/dist/pizzip.min.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/docxtemplater@3.62.0/build/docxtemplater.js" defer></script>
-    <script src="annual-hours.js?v=1.4.0" defer></script>
-    <script src="script.js?v=1.4.0" defer></script>
+    <script src="annual-hours.js?v=1.5.0" defer></script>
+    <script src="script.js?v=1.5.0" defer></script>
   </head>
   <body>
     <header class="site-header">
       <div class="header-inner">
-        <p class="version">SCIENCE PLANNING · v1.3</p>
+        <p class="version">SCIENCE PLANNING · v1.5</p>
         <h1>理科 <span>評価規準ジェネレーター</span></h1>
         <p class="subtitle">学習指導要領の項目から、3観点の評価規準を作成します。</p>
       </div>
@@ -100,7 +100,7 @@
             <label class="field"><span>単位数</span><input id="credits" type="number" min="1" max="10" step="1" value="2"></label>
             <div class="field readonly-field"><span>標準年間時数</span><output id="standard-hours">70時間</output><small>単位数 × 35単位時間</small></div>
             <label class="field"><span>週時数</span><input id="weekly-hours" type="number" min="0" max="50" step="0.1" value="2"></label>
-            <label class="field"><span>実授業時数</span><input id="actual-hours" type="number" min="0" max="1000" step="1" value="70"><small>教材・授業設計に使用する時数</small></label>
+            <div class="field readonly-field"><span>実授業時数</span><output id="actual-hours">0時間</output><small>単元指導計画の配当時数合計（自動集計）</small></div>
           </div>
         </section>
 
@@ -113,6 +113,8 @@
           <div class="output-heading-row"><div class="section-heading"><span class="step-number" aria-hidden="true">03</span><div><h2 id="results-heading">計算結果</h2><p>実働見込みは、曜日未確定段階での概算です。</p></div></div></div>
           <div class="summary-grid">
             <article><span>標準年間時数</span><strong id="summary-standard">70時間</strong></article>
+            <article class="actual-hours-card"><span>実授業時数</span><strong id="summary-actual">0時間</strong><small>単元指導計画から自動集計</small></article>
+            <article class="margin-hours-card"><span>余裕時数</span><strong id="summary-margin">70時間</strong><small>復習・演習・進度調整・学校行事等のための余裕</small></article>
             <article><span>授業可能日数</span><strong id="summary-days">0日</strong></article>
             <article class="expected-card"><span>実働見込み</span><strong id="summary-expected">0.0時間</strong><small id="summary-rounded">（約0時間）</small></article>
             <article><span>年計上の配当</span><strong id="summary-allocation">0 / 70時間</strong></article>
@@ -139,6 +141,7 @@
             <label class="field unit-field"><span>単元</span><select id="plan-unit"></select><input id="plan-custom-unit" type="text" placeholder="単元名を入力" hidden></label>
             <label class="field hours-field"><span>配当時数</span><span class="number-with-unit"><input id="allocated-hours" type="number" min="1" step="1" value="8" inputmode="numeric"><small>時間</small></span></label>
           </div>
+          <div class="unit-hours-total" aria-live="polite"><span>実授業時数 合計</span><strong id="unit-total-hours">0時間</strong><small>この学校・科目で保存済みの単元配当時数を集計</small></div>
         </section>
 
         <section class="unit-generated-block" aria-labelledby="unit-goals-heading">
@@ -163,7 +166,7 @@
     <div class="toast" id="toast" role="status" aria-live="polite">コピーしました</div>
 
     <footer>
-      <p>物理基礎・物理 v1.3　｜　年間時数配分・単元指導計画の入力はブラウザ内に保存されます</p>
+      <p>物理基礎・物理 v1.5　｜　年間時数配分・単元指導計画の入力はブラウザ内に保存されます</p>
     </footer>
   </body>
 </html>
