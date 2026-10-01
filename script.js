@@ -107,23 +107,31 @@ const toast = document.querySelector("#toast");
 let toastTimer;
 
 const MONTHS = ["4月", "5月", "6月", "7月", "8月", "9月", "10月", "11月", "12月", "1月", "2月", "3月"];
-const ANNUAL_SUBJECT_PRESETS = [
-  { id: "physics-basics", name: "物理基礎", credits: 2, weeklyHours: 2 },
-  { id: "physics", name: "物理", credits: 4, weeklyHours: 4 }
-];
-const ANNUAL_STORAGE_KEY = "rika-annual-hours-v2";
+const SCHOOLS = {
+  sanno: { name: "三本木農業恵拓高校", courses: { physicsBasic: { name: "物理基礎", credits: 2, weeklyHours: 2 } } },
+  santo: { name: "三戸高校", courses: { physics: { name: "物理", credits: 4, weeklyHours: 4 } } },
+  gosho: { name: "五所川原工科高校", courses: { inquiryPhysics: { name: "探究物理", credits: 2, weeklyHours: 2 } } },
+  ajigasawa: { name: "鰺ヶ沢高校", courses: { inquiryPhysics: { name: "探究物理", credits: 4, weeklyHours: 4 } } },
+  other: { name: "その他", courses: { custom: { name: "任意の科目", credits: 2, weeklyHours: 2 } } }
+};
+const ANNUAL_SELECTION_KEY = "rika-annual-hours-selection-v3";
+const ANNUAL_STORAGE_PREFIX = "annualHours_";
 const LEGACY_ANNUAL_STORAGE_KEY = "rika-annual-hours-v1";
+const PREVIOUS_ANNUAL_STORAGE_KEY = "rika-annual-hours-v2";
 const criteriaTab = document.querySelector("#criteria-tab");
 const annualTab = document.querySelector("#annual-tab");
 const criteriaView = document.querySelector("#criteria-view");
 const annualView = document.querySelector("#annual-view");
 const unitPlanTab = document.querySelector("#unit-plan-tab");
 const unitPlanView = document.querySelector("#unit-plan-view");
+const annualSchool = document.querySelector("#annual-school");
 const annualSubject = document.querySelector("#annual-subject");
+const customSchoolName = document.querySelector("#custom-school-name");
+const customSubjectName = document.querySelector("#custom-subject-name");
 const creditsInput = document.querySelector("#credits");
 const weeklyHoursInput = document.querySelector("#weekly-hours");
+const actualHoursInput = document.querySelector("#actual-hours");
 const monthInputs = document.querySelector("#month-inputs");
-let annualStore = { selectedSubject: ANNUAL_SUBJECT_PRESETS[0].id, subjects: {} };
 
 function selectedSubject() {
   return SUBJECTS.find(({ subject }) => subject === subjectSelect.value) || SUBJECTS[0];
@@ -237,31 +245,73 @@ function selectView(view) {
   criteriaTab.setAttribute("aria-selected", String(!showAnnual && !showUnitPlan));
 }
 
+function stableCustomId(value, fallback) {
+  const text = value.trim();
+  if (!text) return fallback;
+  let hash = 2166136261;
+  for (const character of text) hash = Math.imul(hash ^ character.codePointAt(0), 16777619);
+  return `custom${(hash >>> 0).toString(36)}`;
+}
+
+function annualIds() {
+  const custom = annualSchool.value === "other";
+  return {
+    schoolId: custom ? stableCustomId(customSchoolName.value, "customSchool") : annualSchool.value,
+    courseId: custom ? stableCustomId(customSubjectName.value, "customCourse") : annualSubject.value
+  };
+}
+
+function annualStorageKey() {
+  const { schoolId, courseId } = annualIds();
+  return `${ANNUAL_STORAGE_PREFIX}${schoolId}_${courseId}`;
+}
+
+function annualPreset() {
+  const school = SCHOOLS[annualSchool.value] || SCHOOLS.sanno;
+  return school.courses[annualSubject.value] || Object.values(school.courses)[0];
+}
+
 function annualState() {
   return {
-    subject: annualSubject.value,
+    schoolId: annualSchool.value,
+    courseId: annualSubject.value,
+    schoolName: annualSchool.value === "other" ? customSchoolName.value.trim() : SCHOOLS[annualSchool.value].name,
+    courseName: annualSchool.value === "other" ? customSubjectName.value.trim() : annualPreset().name,
     credits: Math.min(10, Math.max(1, Math.trunc(Number(creditsInput.value) || 1))),
     weeklyHours: Math.max(0, Number(weeklyHoursInput.value) || 0),
+    actualHours: Math.max(0, Number(actualHoursInput.value) || 0),
     days: [...monthInputs.querySelectorAll("input")].map((input) => Math.max(0, Math.trunc(Number(input.value) || 0)))
   };
 }
 
+function loadStoredAnnualState() {
+  try { return JSON.parse(localStorage.getItem(annualStorageKey())); } catch { return null; }
+}
+
 function saveAnnualState(state) {
-  annualStore.selectedSubject = state.subject;
-  annualStore.subjects[state.subject] = { credits: state.credits, weeklyHours: state.weeklyHours, days: state.days };
-  try { localStorage.setItem(ANNUAL_STORAGE_KEY, JSON.stringify(annualStore)); } catch { /* Storage may be disabled by the browser. */ }
+  try {
+    localStorage.setItem(annualStorageKey(), JSON.stringify(state));
+    localStorage.setItem(ANNUAL_SELECTION_KEY, JSON.stringify({
+      schoolId: state.schoolId, courseId: state.courseId, schoolName: state.schoolName, courseName: state.courseName
+    }));
+  } catch { /* Storage may be disabled by the browser. */ }
 }
 
-function annualPreset(subjectId = annualSubject.value) {
-  return ANNUAL_SUBJECT_PRESETS.find(({ id }) => id === subjectId) || ANNUAL_SUBJECT_PRESETS[0];
+function populateAnnualCourses(courseId) {
+  const courses = SCHOOLS[annualSchool.value].courses;
+  annualSubject.replaceChildren(...Object.entries(courses).map(([id, course]) => new Option(course.name, id)));
+  if (courseId && courses[courseId]) annualSubject.value = courseId;
+  const custom = annualSchool.value === "other";
+  document.querySelector("#custom-school-field").hidden = !custom;
+  document.querySelector("#custom-subject-field").hidden = !custom;
 }
 
-function applyAnnualSubjectState(subjectId, resetToPreset = false) {
-  const preset = annualPreset(subjectId);
-  const saved = annualStore.subjects[subjectId];
-  annualSubject.value = preset.id;
-  creditsInput.value = resetToPreset ? preset.credits : saved?.credits ?? preset.credits;
-  weeklyHoursInput.value = resetToPreset ? preset.weeklyHours : saved?.weeklyHours ?? preset.weeklyHours;
+function applyAnnualState(resetToPreset = false) {
+  const preset = annualPreset();
+  const saved = resetToPreset ? null : loadStoredAnnualState();
+  creditsInput.value = saved?.credits ?? preset.credits;
+  weeklyHoursInput.value = saved?.weeklyHours ?? preset.weeklyHours;
+  actualHoursInput.value = saved?.actualHours ?? calculateAnnualHours(saved?.credits ?? preset.credits);
   [...monthInputs.querySelectorAll("input")].forEach((input, index) => { input.value = saved?.days?.[index] ?? 0; });
 }
 
@@ -289,53 +339,59 @@ function renderAnnual() {
 
 function allocationText() {
   const state = annualState();
-  const annualHours = calculateAnnualHours(state.credits);
-  const allocations = allocateByLargestRemainder(annualHours, state.days);
+  const allocations = allocateByLargestRemainder(calculateAnnualHours(state.credits), state.days);
   return `${MONTHS.map((month, index) => `${month}：${allocations[index]}時間`).join("\n")}\n\n合計：${allocations.reduce((sum, value) => sum + value, 0)}時間`;
 }
 
+function migrateAnnualData() {
+  if (localStorage.getItem("annualHours_sanno_physicsBasic")) return;
+  try {
+    const previous = JSON.parse(localStorage.getItem(PREVIOUS_ANNUAL_STORAGE_KEY));
+    const legacy = JSON.parse(localStorage.getItem(LEGACY_ANNUAL_STORAGE_KEY));
+    const mappings = { "physics-basics": ["sanno", "physicsBasic"], physics: ["santo", "physics"] };
+    Object.entries(previous?.subjects || {}).forEach(([oldId, state]) => {
+      const ids = mappings[oldId];
+      if (ids) localStorage.setItem(`${ANNUAL_STORAGE_PREFIX}${ids[0]}_${ids[1]}`, JSON.stringify({ ...state, actualHours: calculateAnnualHours(state.credits) }));
+    });
+    if (!previous && legacy) {
+      const ids = legacy.subject === "物理" ? mappings.physics : mappings["physics-basics"];
+      localStorage.setItem(`${ANNUAL_STORAGE_PREFIX}${ids[0]}_${ids[1]}`, JSON.stringify({ ...legacy, actualHours: calculateAnnualHours(legacy.credits) }));
+    }
+  } catch { /* Invalid legacy data is ignored without deleting it. */ }
+}
+
 function initializeAnnual() {
-  annualSubject.replaceChildren(...ANNUAL_SUBJECT_PRESETS.map(({ id, name }) => new Option(name, id)));
+  annualSchool.replaceChildren(...Object.entries(SCHOOLS).map(([id, school]) => new Option(school.name, id)));
   monthInputs.replaceChildren(...MONTHS.map((month, index) => {
     const label = document.createElement("label");
     label.className = "month-field";
     label.innerHTML = `<span>${month}</span><span class="number-with-unit"><input type="number" min="0" step="1" inputmode="numeric" data-month="${index}" value="0" aria-label="${month}の授業可能日数"><small>日</small></span>`;
     return label;
   }));
-  try {
-    const saved = JSON.parse(localStorage.getItem(ANNUAL_STORAGE_KEY));
-    if (saved?.subjects) {
-      annualStore = {
-        selectedSubject: annualPreset(saved.selectedSubject).id,
-        subjects: saved.subjects
-      };
-    } else {
-      const legacy = JSON.parse(localStorage.getItem(LEGACY_ANNUAL_STORAGE_KEY));
-      if (legacy) {
-        const preset = ANNUAL_SUBJECT_PRESETS.find(({ name }) => name === legacy.subject) || ANNUAL_SUBJECT_PRESETS[0];
-        annualStore = {
-          selectedSubject: preset.id,
-          subjects: { [preset.id]: { credits: legacy.credits, weeklyHours: legacy.weeklyHours, days: legacy.days } }
-        };
-      }
-    }
-  } catch {
-    localStorage.removeItem(ANNUAL_STORAGE_KEY);
-    annualStore = { selectedSubject: ANNUAL_SUBJECT_PRESETS[0].id, subjects: {} };
+  migrateAnnualData();
+  let selection;
+  try { selection = JSON.parse(localStorage.getItem(ANNUAL_SELECTION_KEY)); } catch { /* Use defaults. */ }
+  if (!selection) {
+    try {
+      const previous = JSON.parse(localStorage.getItem(PREVIOUS_ANNUAL_STORAGE_KEY));
+      const migratedSelection = { "physics-basics": ["sanno", "physicsBasic"], physics: ["santo", "physics"] }[previous?.selectedSubject];
+      if (migratedSelection) selection = { schoolId: migratedSelection[0], courseId: migratedSelection[1] };
+    } catch { /* Use defaults. */ }
   }
-  applyAnnualSubjectState(annualStore.selectedSubject);
+  annualSchool.value = SCHOOLS[selection?.schoolId] ? selection.schoolId : "sanno";
+  customSchoolName.value = selection?.schoolName || "";
+  customSubjectName.value = selection?.courseName || "";
+  populateAnnualCourses(selection?.courseId);
+  applyAnnualState();
   renderAnnual();
 }
 
 criteriaTab.addEventListener("click", () => selectView("criteria"));
 annualTab.addEventListener("click", () => selectView("annual"));
 unitPlanTab.addEventListener("click", () => selectView("unit-plan"));
-annualSubject.addEventListener("change", () => {
-  applyAnnualSubjectState(annualSubject.value, true);
-  renderAnnual();
-});
-creditsInput.addEventListener("input", renderAnnual);
-weeklyHoursInput.addEventListener("input", renderAnnual);
+annualSchool.addEventListener("change", () => { populateAnnualCourses(); applyAnnualState(); renderAnnual(); });
+annualSubject.addEventListener("change", () => { applyAnnualState(); renderAnnual(); });
+[creditsInput, weeklyHoursInput, actualHoursInput, customSchoolName, customSubjectName].forEach((input) => input.addEventListener("input", renderAnnual));
 monthInputs.addEventListener("input", renderAnnual);
 monthInputs.addEventListener("change", (event) => {
   if (event.target.matches("input")) event.target.value = Math.max(0, Math.trunc(Number(event.target.value) || 0));
@@ -346,13 +402,11 @@ document.querySelector("#copy-annual-result").addEventListener("click", () => {
   const state = annualState();
   const annualHours = calculateAnnualHours(state.credits);
   const totalDays = state.days.reduce((sum, value) => sum + value, 0);
-  copyText(`科目：${annualPreset(state.subject).name}\n単位数：${state.credits}単位\n標準年間時数：${annualHours}時間\n授業可能日数：${totalDays}日\n実働見込み：${calculateExpectedHours(totalDays, state.weeklyHours).toFixed(1)}時間（約${Math.round(calculateExpectedHours(totalDays, state.weeklyHours))}時間）\n\n月別配当\n${allocationText()}`);
+  copyText(`学校：${state.schoolName}\n科目：${state.courseName}\n単位数：${state.credits}単位\n標準年間時数：${annualHours}時間\n実授業時数：${state.actualHours}時間\n授業可能日数：${totalDays}日\n実働見込み：${calculateExpectedHours(totalDays, state.weeklyHours).toFixed(1)}時間（約${Math.round(calculateExpectedHours(totalDays, state.weeklyHours))}時間）\n\n月別配当\n${allocationText()}`);
 });
 document.querySelector("#reset-annual").addEventListener("click", () => {
-  localStorage.removeItem(ANNUAL_STORAGE_KEY);
-  localStorage.removeItem(LEGACY_ANNUAL_STORAGE_KEY);
-  annualStore = { selectedSubject: ANNUAL_SUBJECT_PRESETS[0].id, subjects: {} };
-  applyAnnualSubjectState(annualStore.selectedSubject);
+  localStorage.removeItem(annualStorageKey());
+  applyAnnualState(true);
   renderAnnual();
 });
 
