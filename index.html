@@ -130,12 +130,13 @@
         </section>
 
         <section class="input-panel unit-plan-settings" aria-labelledby="unit-settings-heading">
-          <div class="section-heading"><span class="step-number" aria-hidden="true">01</span><div><h2 id="unit-settings-heading">単元情報</h2><p>所属・氏名・科目・単元・配当時数を設定してください。</p></div></div>
+          <div class="section-heading"><span class="step-number" aria-hidden="true">01</span><div><h2 id="unit-settings-heading">単元情報</h2><p>学校・所属・氏名・科目・単元・配当時数を設定してください。</p></div></div>
           <div class="unit-settings-grid">
+            <label class="field school-field"><span>学校</span><select id="plan-school"></select></label>
             <label class="field user-info-field"><span>所属</span><input id="affiliation" type="text" autocomplete="organization" placeholder="例：青森高等学校"></label>
             <label class="field user-info-field"><span>氏名</span><input id="teacher-name" type="text" autocomplete="name" placeholder="例：成田 翔"></label>
             <label class="field subject-field"><span>科目</span><select id="plan-subject"></select></label>
-            <label class="field unit-field"><span>単元</span><select id="plan-unit"></select></label>
+            <label class="field unit-field"><span>単元</span><select id="plan-unit"></select><input id="plan-custom-unit" type="text" placeholder="単元名を入力" hidden></label>
             <label class="field hours-field"><span>配当時数</span><span class="number-with-unit"><input id="allocated-hours" type="number" min="1" step="1" value="8" inputmode="numeric"><small>時間</small></span></label>
           </div>
         </section>

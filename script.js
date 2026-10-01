@@ -413,11 +413,25 @@ document.querySelector("#reset-annual").addEventListener("click", () => {
 populateSubjects();
 initializeAnnual();
 
-const PLAN_SELECTION_KEY = "rika-unit-plan-selection-v1";
-const PLAN_STORAGE_PREFIX = "rika-unit-plan-v1:";
+// Courses and units deliberately live below each school. In particular, the two
+// inquiry-physics entries are independent even though their display names match.
+const SCHOOL_COURSES = {
+  sanno: { physicsBasic: { name: "物理基礎", subjectId: "physics-basics" } },
+  santo: { physics: { name: "物理", subjectId: "physics" } },
+  gosho: { inquiryPhysics: { name: "探究物理", units: [], manualUnit: true } },
+  ajigasawa: { inquiryPhysics: { name: "探究物理", units: [], manualUnit: true } },
+  other: { custom: { name: "任意の科目", units: [], manualUnit: true } }
+};
+const PLAN_SELECTION_KEY = "rika-unit-plan-selection-v2";
+const LEGACY_PLAN_SELECTION_KEY = "rika-unit-plan-selection-v1";
+const PLAN_STORAGE_PREFIX = "rika-unit-plan-v2:";
+const LEGACY_PLAN_STORAGE_PREFIX = "rika-unit-plan-v1:";
+const PLAN_LAST_UNIT_PREFIX = "rika-unit-plan-last-unit-v2:";
 const PLAN_USER_INFO_KEY = "rika-unit-plan-user-info-v1";
+const planSchool = document.querySelector("#plan-school");
 const planSubject = document.querySelector("#plan-subject");
 const planUnit = document.querySelector("#plan-unit");
+const planCustomUnit = document.querySelector("#plan-custom-unit");
 const allocatedHoursInput = document.querySelector("#allocated-hours");
 const affiliationInput = document.querySelector("#affiliation");
 const teacherNameInput = document.querySelector("#teacher-name");
@@ -425,7 +439,10 @@ const lessonRows = document.querySelector("#lesson-rows");
 const evaluationValues = ["", "formative", "summative"];
 
 function planSubjectData() {
-  return SUBJECTS.find(({ subject }) => subject === planSubject.value) || SUBJECTS[0];
+  const course = SCHOOL_COURSES[planSchool.value]?.[planSubject.value] || Object.values(SCHOOL_COURSES.sanno)[0];
+  const preset = SUBJECTS.find(({ subject }) => subject === course.subjectId);
+  const schoolUnits = course.units?.length ? [{ majorSection: "学校設定単元", units: course.units }] : [];
+  return preset ? { ...preset, courseId: planSubject.value } : { subject: planSubject.value, courseId: planSubject.value, name: course.name, majorSections: course.majorSections || schoolUnits };
 }
 
 function planUnits(subject = planSubjectData()) {
@@ -433,11 +450,14 @@ function planUnits(subject = planSubjectData()) {
 }
 
 function planUnitData() {
-  return planUnits().find(({ id }) => id === planUnit.value) || planUnits()[0];
+  const preset = planUnits().find(({ id }) => id === planUnit.value) || planUnits()[0];
+  if (preset) return preset;
+  const name = planCustomUnit.value.trim() || "単元名未設定";
+  return { id: stableCustomId(name, "manualUnit"), unit: name, subItems: ["設定した学習内容"] };
 }
 
 function planStorageKey() {
-  return `${PLAN_STORAGE_PREFIX}${planSubjectData().subject}__${planUnitData().id}`;
+  return `${PLAN_STORAGE_PREFIX}${planSchool.value}__${planSubject.value}__${planUnitData().id}`;
 }
 
 function blankLesson(hour) {
@@ -450,7 +470,7 @@ function normalizedPlan(raw = {}) {
     const saved = raw.rows?.[index] || {};
     return { ...blankLesson(index + 1), ...saved, hour: index + 1, evaluation: { ...blankLesson(0).evaluation, ...saved.evaluation } };
   });
-  return { subjectId: planSubjectData().subject, unitId: planUnitData().id, allocatedHours, rows };
+  return { schoolId: planSchool.value, courseId: planSubject.value, unitId: planUnitData().id, unitName: planUnitData().unit, allocatedHours, rows };
 }
 
 function loadPlan() {
@@ -466,13 +486,14 @@ function currentPlan() {
     evaluation: Object.fromEntries(["knowledge", "thinking", "attitude"].map((key) => [key, row.querySelector(`[data-evaluation="${key}"]`).dataset.value || ""])),
     method: row.querySelector('[data-field="method"]').value
   }));
-  return { subjectId: planSubjectData().subject, unitId: planUnitData().id, allocatedHours, rows };
+  return { schoolId: planSchool.value, courseId: planSubject.value, unitId: planUnitData().id, unitName: planUnitData().unit, allocatedHours, rows };
 }
 
 function savePlan() {
   try {
     localStorage.setItem(planStorageKey(), JSON.stringify(currentPlan()));
-    localStorage.setItem(PLAN_SELECTION_KEY, JSON.stringify({ subjectId: planSubjectData().subject, unitId: planUnitData().id }));
+    localStorage.setItem(PLAN_SELECTION_KEY, JSON.stringify({ schoolId: planSchool.value, courseId: planSubject.value, unitId: planUnitData().id, unitName: planUnitData().unit }));
+    localStorage.setItem(`${PLAN_LAST_UNIT_PREFIX}${planSchool.value}__${planSubject.value}`, JSON.stringify({ unitId: planUnitData().id, unitName: planUnitData().unit }));
   } catch { /* Storage may be disabled by the browser. */ }
 }
 
@@ -541,7 +562,11 @@ function renderUnitPlan() {
 }
 
 function populatePlanUnits(preferredUnit) {
-  planUnit.replaceChildren(...planSubjectData().majorSections.map(({ majorSection, units }) => {
+  const subject = planSubjectData();
+  const hasPresets = subject.majorSections.length > 0;
+  planUnit.hidden = !hasPresets;
+  planCustomUnit.hidden = hasPresets;
+  planUnit.replaceChildren(...subject.majorSections.map(({ majorSection, units }) => {
     const group = document.createElement("optgroup");
     group.label = majorSection;
     group.replaceChildren(...units.map(({ id, unit }) => new Option(unit, id)));
@@ -551,17 +576,53 @@ function populatePlanUnits(preferredUnit) {
   renderUnitPlan();
 }
 
-function initializeUnitPlan() {
-  loadUserInfo();
-  planSubject.replaceChildren(...SUBJECTS.map(({ subject, name }) => new Option(name, subject)));
-  let selection = {};
-  try { selection = JSON.parse(localStorage.getItem(PLAN_SELECTION_KEY)) || {}; } catch { /* Use defaults. */ }
-  if (SUBJECTS.some(({ subject }) => subject === selection.subjectId)) planSubject.value = selection.subjectId;
-  populatePlanUnits(selection.unitId);
+function populatePlanCourses(preferredCourse, preferredUnit, preferredUnitName) {
+  const courses = SCHOOL_COURSES[planSchool.value];
+  planSubject.replaceChildren(...Object.entries(courses).map(([id, course]) => new Option(course.name, id)));
+  if (preferredCourse && courses[preferredCourse]) planSubject.value = preferredCourse;
+  let remembered = {};
+  if (!preferredUnit && !preferredUnitName) {
+    try { remembered = JSON.parse(localStorage.getItem(`${PLAN_LAST_UNIT_PREFIX}${planSchool.value}__${planSubject.value}`)) || {}; }
+    catch { /* Use the first preset or an empty manual unit. */ }
+  }
+  planCustomUnit.value = preferredUnitName || remembered.unitName || "";
+  populatePlanUnits(preferredUnit || remembered.unitId);
 }
 
-planSubject.addEventListener("change", () => populatePlanUnits());
+function migrateUnitPlanData() {
+  const mappings = { "physics-basics": ["sanno", "physicsBasic"], physics: ["santo", "physics"] };
+  for (const subject of SUBJECTS) {
+    const [schoolId, courseId] = mappings[subject.subject];
+    for (const unit of subject.majorSections.flatMap(({ units }) => units)) {
+      const oldKey = `${LEGACY_PLAN_STORAGE_PREFIX}${subject.subject}__${unit.id}`;
+      const newKey = `${PLAN_STORAGE_PREFIX}${schoolId}__${courseId}__${unit.id}`;
+      const oldValue = localStorage.getItem(oldKey);
+      if (oldValue !== null && localStorage.getItem(newKey) === null) localStorage.setItem(newKey, oldValue);
+    }
+  }
+}
+
+function initializeUnitPlan() {
+  loadUserInfo();
+  planSchool.replaceChildren(...Object.entries(SCHOOLS).map(([id, school]) => new Option(school.name, id)));
+  try { migrateUnitPlanData(); } catch { /* Keep legacy data untouched when storage is unavailable. */ }
+  let selection = {};
+  try { selection = JSON.parse(localStorage.getItem(PLAN_SELECTION_KEY)) || {}; } catch { /* Use defaults. */ }
+  if (!selection.schoolId) {
+    try {
+      const legacy = JSON.parse(localStorage.getItem(LEGACY_PLAN_SELECTION_KEY)) || {};
+      const mapped = { "physics-basics": ["sanno", "physicsBasic"], physics: ["santo", "physics"] }[legacy.subjectId];
+      if (mapped) selection = { schoolId: mapped[0], courseId: mapped[1], unitId: legacy.unitId };
+    } catch { /* Use defaults. */ }
+  }
+  planSchool.value = SCHOOL_COURSES[selection.schoolId] ? selection.schoolId : "sanno";
+  populatePlanCourses(selection.courseId, selection.unitId, selection.unitName);
+}
+
+planSchool.addEventListener("change", () => populatePlanCourses());
+planSubject.addEventListener("change", () => populatePlanCourses(planSubject.value));
 planUnit.addEventListener("change", renderUnitPlan);
+planCustomUnit.addEventListener("change", renderUnitPlan);
 affiliationInput.addEventListener("input", saveUserInfo);
 teacherNameInput.addEventListener("input", saveUserInfo);
 allocatedHoursInput.addEventListener("change", () => {
@@ -592,7 +653,7 @@ function unitPlanText() {
   const lessons = plan.rows.map((row) => `${row.hour}時間目\n学習活動：\n${row.activity || "－"}\n\n知：${evaluationMark(row.evaluation.knowledge) || "－"}\n思：${evaluationMark(row.evaluation.thinking) || "－"}\n態：${evaluationMark(row.evaluation.attitude) || "－"}\n\n評価の観点及び方法：\n${row.method || "－"}`).join("\n\n---\n\n");
   const info = userInfo();
   const userInfoText = [info.affiliation && `所属：${info.affiliation}`, info.teacherName && `氏名：${info.teacherName}`].filter(Boolean);
-  return `${userInfoText.length ? `${userInfoText.join("\n")}\n` : ""}科目：${subject.name}\n単元名：${unit.unit}\n配当時数：${plan.allocatedHours}時間\n\n【単元の目標】\n\n${goals}\n\n【単元の評価規準】\n\n${criteria}\n\n【指導と評価の計画】\n\n${lessons}`;
+  return `学校：${SCHOOLS[planSchool.value].name}\n${userInfoText.length ? `${userInfoText.join("\n")}\n` : ""}科目：${subject.name}\n単元名：${unit.unit}\n配当時数：${plan.allocatedHours}時間\n\n【単元の目標】\n\n${goals}\n\n【単元の評価規準】\n\n${criteria}\n\n【指導と評価の計画】\n\n${lessons}`;
 }
 
 const UNIT_PLAN_TEMPLATE_PATH = "public/templates/unit-plan-template.docx";
@@ -605,6 +666,7 @@ function wordTemplateData() {
   const criteria = generatedCriteria(unit);
   const info = userInfo();
   return {
+    school: SCHOOLS[planSchool.value].name,
     affiliation: info.affiliation,
     teacherName: info.teacherName,
     subject: subject.name,
