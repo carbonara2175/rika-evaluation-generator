@@ -114,12 +114,14 @@ footer p { margin: 0; }
 .number-with-unit input { padding-right: 32px; }
 .number-with-unit small { position: absolute; top: 50%; right: 11px; color: var(--muted); transform: translateY(-50%); }
 .annual-results { margin-top: 38px; }
-.summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 22px; }
+.summary-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 22px; }
 .summary-grid article { display: flex; min-height: 125px; padding: 18px; flex-direction: column; justify-content: center; background: #fff; border: 1px solid var(--line); border-top: 4px solid var(--navy); border-radius: 9px; box-shadow: var(--shadow); }
 .summary-grid article span { color: var(--muted); font-size: .79rem; font-weight: 700; }
 .summary-grid article strong { color: var(--navy); font-size: 1.5rem; }
 .summary-grid article small { color: var(--blue); }
 .summary-grid .expected-card { border-top-color: var(--blue); background: #f7fbfe; }
+.summary-grid .actual-hours-card { border-top-color: var(--success); background: #f7fcfa; }
+.summary-grid .margin-hours-card { border-top-color: #8a6943; }
 .result-table-wrap { overflow-x: auto; background: #fff; border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
 table { width: 100%; border-collapse: collapse; font-size: .9rem; }
 th, td { padding: 12px 18px; border-bottom: 1px solid var(--line); text-align: right; }
@@ -142,6 +144,10 @@ tfoot th, tfoot td { border-bottom: 0; }
 .unit-field { grid-column: span 3; }
 .hours-field { grid-column: span 1; }
 .hours-field input { padding-right: 48px; }
+.unit-hours-total { display: flex; margin-top: 22px; padding: 16px 20px; align-items: baseline; gap: 12px; color: var(--navy); background: var(--blue-soft); border: 1px solid #c9d9e4; border-radius: 8px; }
+.unit-hours-total span { font-size: .9rem; font-weight: 700; }
+.unit-hours-total strong { font-size: 1.5rem; }
+.unit-hours-total small { margin-left: auto; color: var(--muted); font-size: .74rem; }
 .unit-generated-block, .unit-plan-block { margin-top: 34px; }
 .generated-list { display: grid; gap: 12px; margin-top: 20px; }
 .generated-list article { padding: 18px 22px; background: #fff; border: 1px solid var(--line); border-left: 4px solid var(--blue); border-radius: 8px; box-shadow: var(--shadow); }
@@ -188,6 +194,8 @@ textarea:focus-visible { outline: 3px solid rgba(38, 113, 166, .28); outline-off
   .annual-actions { align-items: stretch; flex-direction: column; }
   .annual-actions button { width: 100%; }
   .unit-settings-grid { grid-template-columns: 1fr; }
+  .unit-hours-total { align-items: flex-start; flex-direction: column; gap: 2px; }
+  .unit-hours-total small { margin-left: 0; }
   .school-field, .user-info-field, .subject-field, .unit-field, .hours-field { grid-column: auto; }
   .plan-heading-row { align-items: flex-start; flex-direction: column; }
   .evaluation-legend { align-items: flex-start; flex-direction: column; gap: 3px; }
