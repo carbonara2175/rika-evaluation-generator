@@ -29,4 +29,8 @@ function calculateUnitHoursTotal(plans) {
   return plans.reduce((total, plan) => total + Math.max(0, Math.trunc(Number(plan?.allocatedHours) || 0)), 0);
 }
 
-if (typeof module !== "undefined") module.exports = { calculateAnnualHours, calculateExpectedHours, calculateProportionalAllocation, allocateByLargestRemainder, calculateUnitHoursTotal };
+function calculateOperationalDifference(projectedHours, unitPlanHours) {
+  return (Number(projectedHours) || 0) - (Number(unitPlanHours) || 0);
+}
+
+if (typeof module !== "undefined") module.exports = { calculateAnnualHours, calculateExpectedHours, calculateProportionalAllocation, allocateByLargestRemainder, calculateUnitHoursTotal, calculateOperationalDifference };
