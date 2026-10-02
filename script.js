@@ -321,7 +321,8 @@ function renderAnnual() {
   const state = annualState();
   const annualHours = calculateAnnualHours(state.credits);
   const totalDays = state.days.reduce((sum, value) => sum + value, 0);
-  const expected = calculateExpectedHours(totalDays, state.weeklyHours);
+  const rawProjectedHours = calculateExpectedHours(totalDays, state.weeklyHours);
+  const rawDifference = calculateOperationalDifference(rawProjectedHours, state.actualHours);
   const allocations = allocateByLargestRemainder(annualHours, state.days);
   const allocated = allocations.reduce((sum, value) => sum + value, 0);
   const marginHours = annualHours - state.actualHours;
@@ -331,15 +332,17 @@ function renderAnnual() {
   document.querySelector("#summary-actual").textContent = `${state.actualHours}時間`;
   document.querySelector("#summary-margin").textContent = `${marginHours}時間`;
   document.querySelector("#summary-days").textContent = `${totalDays}日`;
-  document.querySelector("#summary-expected").textContent = `${expected.toFixed(1)}時間`;
-  document.querySelector("#summary-rounded").textContent = `（約${Math.round(expected)}時間）`;
+  document.querySelector("#summary-expected").textContent = `${Math.round(rawProjectedHours)}時間`;
+  document.querySelector("#summary-difference-label").textContent = rawDifference < 0 ? "不足見込み" : "余裕見込み";
+  document.querySelector("#summary-difference").textContent = `${Math.round(Math.abs(rawDifference))}時間`;
+  document.querySelector("#difference-card").classList.toggle("shortage", rawDifference < 0);
   document.querySelector("#summary-allocation").textContent = `${allocated} / ${annualHours}時間`;
   document.querySelector("#annual-table-body").replaceChildren(...MONTHS.map((month, index) => {
     const row = document.createElement("tr");
     row.innerHTML = `<th scope="row">${month}</th><td>${state.days[index]}日</td><td>${calculateExpectedHours(state.days[index], state.weeklyHours).toFixed(1)}h</td><td><strong>${allocations[index]}h</strong></td>`;
     return row;
   }));
-  document.querySelector("#annual-table-foot").innerHTML = `<tr><th scope="row">合計</th><td>${totalDays}日</td><td>${expected.toFixed(1)}h</td><td>${allocated}h</td></tr>`;
+  document.querySelector("#annual-table-foot").innerHTML = `<tr><th scope="row">合計</th><td>${totalDays}日</td><td>${rawProjectedHours.toFixed(1)}h</td><td>${allocated}h</td></tr>`;
   saveAnnualState(state);
 }
 
@@ -408,7 +411,10 @@ document.querySelector("#copy-annual-result").addEventListener("click", () => {
   const state = annualState();
   const annualHours = calculateAnnualHours(state.credits);
   const totalDays = state.days.reduce((sum, value) => sum + value, 0);
-  copyText(`学校：${state.schoolName}\n科目：${state.courseName}\n単位数：${state.credits}単位\n標準年間時数：${annualHours}時間\n実授業時数：${state.actualHours}時間\n授業可能日数：${totalDays}日\n実働見込み：${calculateExpectedHours(totalDays, state.weeklyHours).toFixed(1)}時間（約${Math.round(calculateExpectedHours(totalDays, state.weeklyHours))}時間）\n\n月別配当\n${allocationText()}`);
+  const rawProjectedHours = calculateExpectedHours(totalDays, state.weeklyHours);
+  const rawDifference = calculateOperationalDifference(rawProjectedHours, state.actualHours);
+  const differenceLabel = rawDifference < 0 ? "不足見込み" : "余裕見込み";
+  copyText(`学校：${state.schoolName}\n科目：${state.courseName}\n単位数：${state.credits}単位\n標準年間時数：${annualHours}時間\n単元指導計画時数：${state.actualHours}時間\n授業実施見込み：${Math.round(rawProjectedHours)}時間\n${differenceLabel}：${Math.round(Math.abs(rawDifference))}時間\n授業可能日数：${totalDays}日\n標準時数との差：${annualHours - state.actualHours}時間（実施上の余裕ではありません）\n\n月別配当\n${allocationText()}`);
 });
 document.querySelector("#reset-annual").addEventListener("click", () => {
   localStorage.removeItem(annualStorageKey());

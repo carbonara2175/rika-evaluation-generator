@@ -121,7 +121,12 @@ footer p { margin: 0; }
 .summary-grid article small { color: var(--blue); }
 .summary-grid .expected-card { border-top-color: var(--blue); background: #f7fbfe; }
 .summary-grid .actual-hours-card { border-top-color: var(--success); background: #f7fcfa; }
-.summary-grid .margin-hours-card { border-top-color: #8a6943; }
+.summary-grid .difference-card { border-top-color: var(--success); background: #f7fcfa; }
+.summary-grid .difference-card.shortage { border-top-color: #b7791f; background: #fffaf0; }
+.summary-grid .difference-card.shortage strong, .summary-grid .difference-card.shortage small { color: #9c5b12; }
+.summary-grid .standard-difference-card { min-height: 105px; border-top-width: 2px; background: #fafbfc; box-shadow: none; }
+.summary-grid .standard-difference-card strong { font-size: 1.25rem; }
+.summary-grid .standard-difference-card small { color: var(--muted); }
 .result-table-wrap { overflow-x: auto; background: #fff; border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
 table { width: 100%; border-collapse: collapse; font-size: .9rem; }
 th, td { padding: 12px 18px; border-bottom: 1px solid var(--line); text-align: right; }
