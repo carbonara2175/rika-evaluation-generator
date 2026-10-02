@@ -124,6 +124,8 @@ const criteriaView = document.querySelector("#criteria-view");
 const annualView = document.querySelector("#annual-view");
 const unitPlanTab = document.querySelector("#unit-plan-tab");
 const unitPlanView = document.querySelector("#unit-plan-view");
+const annualEventsTab = document.querySelector("#annual-events-tab");
+const annualEventsView = document.querySelector("#annual-events-view");
 const annualSchool = document.querySelector("#annual-school");
 const annualSubject = document.querySelector("#annual-subject");
 const customSchoolName = document.querySelector("#custom-school-name");
@@ -234,16 +236,21 @@ copyObjectiveButton.addEventListener("click", () => copyText(selectedSubject().o
 function selectView(view) {
   const showAnnual = view === "annual";
   const showUnitPlan = view === "unit-plan";
+  const showAnnualEvents = view === "annual-events";
   annualView.hidden = !showAnnual;
   unitPlanView.hidden = !showUnitPlan;
-  criteriaView.hidden = showAnnual || showUnitPlan;
+  annualEventsView.hidden = !showAnnualEvents;
+  criteriaView.hidden = showAnnual || showUnitPlan || showAnnualEvents;
   annualTab.classList.toggle("active", showAnnual);
   unitPlanTab.classList.toggle("active", showUnitPlan);
-  criteriaTab.classList.toggle("active", !showAnnual && !showUnitPlan);
+  annualEventsTab.classList.toggle("active", showAnnualEvents);
+  criteriaTab.classList.toggle("active", !showAnnual && !showUnitPlan && !showAnnualEvents);
   annualTab.setAttribute("aria-selected", String(showAnnual));
   unitPlanTab.setAttribute("aria-selected", String(showUnitPlan));
-  criteriaTab.setAttribute("aria-selected", String(!showAnnual && !showUnitPlan));
+  annualEventsTab.setAttribute("aria-selected", String(showAnnualEvents));
+  criteriaTab.setAttribute("aria-selected", String(!showAnnual && !showUnitPlan && !showAnnualEvents));
   if (showAnnual) renderAnnual();
+  if (showAnnualEvents) renderAnnualEvents();
 }
 
 function stableCustomId(value, fallback) {
@@ -398,6 +405,7 @@ function initializeAnnual() {
 criteriaTab.addEventListener("click", () => selectView("criteria"));
 annualTab.addEventListener("click", () => selectView("annual"));
 unitPlanTab.addEventListener("click", () => selectView("unit-plan"));
+annualEventsTab.addEventListener("click", () => selectView("annual-events"));
 annualSchool.addEventListener("change", () => { populateAnnualCourses(); applyAnnualState(); renderAnnual(); });
 annualSubject.addEventListener("change", () => { applyAnnualState(); renderAnnual(); });
 [creditsInput, weeklyHoursInput, customSchoolName, customSubjectName].forEach((input) => input.addEventListener("input", renderAnnual));
@@ -763,6 +771,165 @@ document.querySelector("#reset-unit-plan").addEventListener("click", () => {
   renderUnitPlan();
 });
 
+const EVENTS_SELECTION_KEY = "rika-annual-events-selection-v1";
+const eventsSchool = document.querySelector("#events-school");
+const eventsYear = document.querySelector("#events-year");
+const eventForm = document.querySelector("#event-form");
+const eventStartDate = document.querySelector("#event-start-date");
+const eventEndDate = document.querySelector("#event-end-date");
+const eventTitle = document.querySelector("#event-title");
+const eventCategory = document.querySelector("#event-category");
+const eventClassesAvailable = document.querySelector("#event-classes-available");
+const eventMemo = document.querySelector("#event-memo");
+const eventSubmit = document.querySelector("#event-submit");
+const eventCancel = document.querySelector("#event-cancel");
+const eventsTableBody = document.querySelector("#events-table-body");
+const eventsEmpty = document.querySelector("#events-empty");
+let editingEventId = null;
+
+function selectedEventsYear() {
+  return Math.min(2100, Math.max(2000, Math.trunc(Number(eventsYear.value) || new Date().getFullYear())));
+}
+
+function loadAnnualEvents() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(annualEventsStorageKey(eventsSchool.value, selectedEventsYear())));
+    return Array.isArray(saved) ? sortAnnualEvents(saved) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveAnnualEvents(events) {
+  try {
+    localStorage.setItem(annualEventsStorageKey(eventsSchool.value, selectedEventsYear()), JSON.stringify(sortAnnualEvents(events)));
+    localStorage.setItem(EVENTS_SELECTION_KEY, JSON.stringify({ schoolId: eventsSchool.value, year: selectedEventsYear() }));
+  } catch { /* Storage may be disabled by the browser. */ }
+}
+
+function resetEventForm() {
+  editingEventId = null;
+  eventForm.reset();
+  eventSubmit.textContent = "行事を追加";
+  eventCancel.hidden = true;
+  document.querySelector("#event-form-heading").textContent = "行事を追加";
+}
+
+function createEventRow(item) {
+  const row = document.createElement("tr");
+  const values = [
+    formatEventDateRange(item.startDate, item.endDate),
+    item.title,
+    ANNUAL_EVENT_CATEGORIES[item.category],
+    item.regularClassesAvailable ? "実施できる" : "実施できない",
+    item.memo || "－"
+  ];
+  values.forEach((value, index) => {
+    const cell = document.createElement(index === 1 ? "th" : "td");
+    if (index === 1) cell.scope = "row";
+    cell.textContent = value;
+    if (index === 2) cell.className = `event-category category-${item.category}`;
+    if (index === 3) cell.className = item.regularClassesAvailable ? "classes-available" : "classes-unavailable";
+    row.append(cell);
+  });
+  const actions = document.createElement("td");
+  actions.className = "event-row-actions";
+  actions.innerHTML = `<button type="button" data-action="edit">編集</button><button type="button" data-action="delete">削除</button>`;
+  actions.querySelectorAll("button").forEach((button) => { button.dataset.id = item.id; });
+  row.append(actions);
+  return row;
+}
+
+function renderAnnualEvents() {
+  const year = selectedEventsYear();
+  eventsYear.value = year;
+  const events = loadAnnualEvents();
+  eventsTableBody.replaceChildren(...events.map(createEventRow));
+  eventsEmpty.hidden = events.length > 0;
+  document.querySelector("#events-list-description").textContent = `${SCHOOLS[eventsSchool.value].name}・${year}年度（${events.length}件）を日付順に表示しています。`;
+}
+
+function changeEventsContext() {
+  resetEventForm();
+  saveAnnualEvents(loadAnnualEvents());
+  renderAnnualEvents();
+}
+
+function editAnnualEvent(id) {
+  const item = loadAnnualEvents().find((event) => event.id === id);
+  if (!item) return;
+  editingEventId = item.id;
+  eventStartDate.value = item.startDate;
+  eventEndDate.value = item.endDate === item.startDate ? "" : item.endDate;
+  eventTitle.value = item.title;
+  eventCategory.value = item.category;
+  eventClassesAvailable.checked = item.regularClassesAvailable;
+  eventMemo.value = item.memo;
+  eventSubmit.textContent = "変更を保存";
+  eventCancel.hidden = false;
+  document.querySelector("#event-form-heading").textContent = "行事を編集";
+  eventForm.scrollIntoView({ behavior: "smooth", block: "center" });
+  eventTitle.focus({ preventScroll: true });
+}
+
+function annualEventId() {
+  return globalThis.crypto?.randomUUID?.() || `event-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+function initializeAnnualEvents() {
+  eventsSchool.replaceChildren(...Object.entries(SCHOOLS).map(([id, school]) => new Option(school.name, id)));
+  eventCategory.replaceChildren(...Object.entries(ANNUAL_EVENT_CATEGORIES).map(([id, name]) => new Option(name, id)));
+  let selection = {};
+  try { selection = JSON.parse(localStorage.getItem(EVENTS_SELECTION_KEY)) || {}; } catch { /* Use defaults. */ }
+  eventsSchool.value = SCHOOLS[selection.schoolId] ? selection.schoolId : "sanno";
+  eventsYear.value = Number.isInteger(selection.year) ? selection.year : new Date().getFullYear();
+  renderAnnualEvents();
+}
+
+eventsSchool.addEventListener("change", changeEventsContext);
+eventsYear.addEventListener("change", changeEventsContext);
+eventCancel.addEventListener("click", resetEventForm);
+eventForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  eventTitle.setCustomValidity(eventTitle.value.trim() ? "" : "行事名を入力してください。");
+  eventEndDate.setCustomValidity(eventEndDate.value && eventEndDate.value < eventStartDate.value ? "終了日は開始日以降の日付を指定してください。" : "");
+  if (!eventForm.reportValidity()) return;
+  const item = normalizeAnnualEvent({
+    id: editingEventId || annualEventId(),
+    startDate: eventStartDate.value,
+    endDate: eventEndDate.value,
+    title: eventTitle.value.trim(),
+    category: eventCategory.value,
+    regularClassesAvailable: eventClassesAvailable.checked,
+    memo: eventMemo.value.trim()
+  });
+  const events = loadAnnualEvents();
+  const existingIndex = events.findIndex(({ id }) => id === editingEventId);
+  if (existingIndex >= 0) events[existingIndex] = item;
+  else events.push(item);
+  saveAnnualEvents(events);
+  resetEventForm();
+  renderAnnualEvents();
+  showToast(existingIndex >= 0 ? "行事を更新しました" : "行事を追加しました");
+});
+eventTitle.addEventListener("input", () => eventTitle.setCustomValidity(""));
+eventEndDate.addEventListener("input", () => eventEndDate.setCustomValidity(""));
+eventsTableBody.addEventListener("click", (event) => {
+  const button = event.target.closest("button[data-action]");
+  if (!button) return;
+  if (button.dataset.action === "edit") {
+    editAnnualEvent(button.dataset.id);
+    return;
+  }
+  const item = loadAnnualEvents().find(({ id }) => id === button.dataset.id);
+  if (!item || !window.confirm(`「${item.title}」を削除しますか？`)) return;
+  saveAnnualEvents(loadAnnualEvents().filter(({ id }) => id !== item.id));
+  if (editingEventId === item.id) resetEventForm();
+  renderAnnualEvents();
+  showToast("行事を削除しました");
+});
+
 initializeUnitPlan();
 populateSubjects();
 initializeAnnual();
+initializeAnnualEvents();

@@ -5,16 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="学習指導要領の項目から、物理基礎・物理の3観点の評価規準を作成します。">
     <title>理科 評価規準ジェネレーター</title>
-    <link rel="stylesheet" href="style.css?v=1.5.1">
+    <link rel="stylesheet" href="style.css?v=1.6.0">
     <script src="https://cdn.jsdelivr.net/npm/pizzip@3.2.0/dist/pizzip.min.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/docxtemplater@3.62.0/build/docxtemplater.js" defer></script>
     <script src="annual-hours.js?v=1.5.1" defer></script>
-    <script src="script.js?v=1.5.1" defer></script>
+    <script src="annual-events.js?v=1.0.0" defer></script>
+    <script src="script.js?v=1.6.0" defer></script>
   </head>
   <body>
     <header class="site-header">
       <div class="header-inner">
-        <p class="version">SCIENCE PLANNING · v1.5</p>
+        <p class="version">SCIENCE PLANNING · v1.6</p>
         <h1>理科 <span>評価規準ジェネレーター</span></h1>
         <p class="subtitle">学習指導要領の項目から、3観点の評価規準を作成します。</p>
       </div>
@@ -25,6 +26,7 @@
         <button class="nav-tab active" id="criteria-tab" type="button" role="tab" aria-selected="true" aria-controls="criteria-view">評価規準</button>
         <button class="nav-tab" id="annual-tab" type="button" role="tab" aria-selected="false" aria-controls="annual-view">年間時数配分</button>
         <button class="nav-tab" id="unit-plan-tab" type="button" role="tab" aria-selected="false" aria-controls="unit-plan-view">単元指導計画</button>
+        <button class="nav-tab" id="annual-events-tab" type="button" role="tab" aria-selected="false" aria-controls="annual-events-view">年間行事</button>
       </div>
     </nav>
 
@@ -162,12 +164,49 @@
           <div class="unit-plan-actions"><button class="copy-all-button" id="export-unit-plan-word" type="button">Word形式で出力</button><button class="copy-all-button secondary" id="copy-unit-plan" type="button">単元指導計画をまとめてコピー</button><button class="reset-button" id="reset-unit-plan" type="button">この単元の入力をリセット</button></div>
         </section>
       </div>
+
+      <div id="annual-events-view" role="tabpanel" aria-labelledby="annual-events-tab" hidden>
+        <section class="annual-intro">
+          <p class="eyebrow">ANNUAL EVENTS</p>
+          <h2>年間行事</h2>
+          <p>学校・年度ごとの年間行事を登録し、学校暦の基礎データとして保存します。</p>
+        </section>
+
+        <section class="input-panel events-context" aria-labelledby="events-context-heading">
+          <div class="section-heading"><span class="step-number" aria-hidden="true">01</span><div><h2 id="events-context-heading">学校と年度</h2><p>行事を登録する学校と年度を選択してください。</p></div></div>
+          <div class="events-context-grid">
+            <label class="field"><span>学校</span><select id="events-school"></select></label>
+            <label class="field"><span>年度</span><span class="year-input"><input id="events-year" type="number" min="2000" max="2100" step="1" inputmode="numeric"><small>年度</small></span></label>
+          </div>
+        </section>
+
+        <section class="input-panel event-form-panel" aria-labelledby="event-form-heading">
+          <div class="section-heading"><span class="step-number" aria-hidden="true">02</span><div><h2 id="event-form-heading">行事を追加</h2><p>開始日・行事名・区分は必須です。</p></div></div>
+          <form id="event-form" class="event-form-grid">
+            <label class="field"><span>開始日 <b class="required">必須</b></span><input id="event-start-date" type="date" required></label>
+            <label class="field"><span>終了日</span><input id="event-end-date" type="date"><small>未入力の場合は開始日と同じ日になります</small></label>
+            <label class="field event-title-field"><span>行事名 <b class="required">必須</b></span><input id="event-title" type="text" maxlength="100" required placeholder="例：1学期中間考査"></label>
+            <label class="field"><span>区分 <b class="required">必須</b></span><select id="event-category" required></select></label>
+            <label class="checkbox-field"><input id="event-classes-available" type="checkbox"><span>通常授業を実施できる</span></label>
+            <label class="field event-memo-field"><span>メモ</span><textarea id="event-memo" rows="2" maxlength="500" placeholder="補足事項があれば入力"></textarea></label>
+            <div class="event-form-actions"><button class="copy-all-button" id="event-submit" type="submit">行事を追加</button><button class="reset-button" id="event-cancel" type="button" hidden>編集をキャンセル</button></div>
+          </form>
+        </section>
+
+        <section class="events-list-section" aria-labelledby="events-list-heading">
+          <div class="section-heading"><span class="step-number" aria-hidden="true">03</span><div><h2 id="events-list-heading">登録済みの行事</h2><p id="events-list-description">日付順に表示します。</p></div></div>
+          <div class="events-table-wrap">
+            <table class="events-table"><thead><tr><th>日付</th><th>行事名</th><th>区分</th><th>通常授業</th><th>メモ</th><th>操作</th></tr></thead><tbody id="events-table-body"></tbody></table>
+            <p id="events-empty" class="events-empty">この学校・年度の行事はまだ登録されていません。</p>
+          </div>
+        </section>
+      </div>
     </main>
 
     <div class="toast" id="toast" role="status" aria-live="polite">コピーしました</div>
 
     <footer>
-      <p>物理基礎・物理 v1.5　｜　年間時数配分・単元指導計画の入力はブラウザ内に保存されます</p>
+      <p>物理基礎・物理 v1.6　｜　年間時数配分・単元指導計画・年間行事の入力はブラウザ内に保存されます</p>
     </footer>
   </body>
 </html>
