@@ -793,6 +793,8 @@ const scheduleList = document.querySelector("#schedule-list");
 const scheduleEmpty = document.querySelector("#schedule-empty");
 const scheduleMessage = document.querySelector("#schedule-message");
 const scheduleWeeklyHours = document.querySelector("#schedule-weekly-hours strong");
+const projectionTableBody = document.querySelector("#projection-table-body");
+const projectionEmpty = document.querySelector("#projection-empty");
 let editingEventId = null;
 
 function selectedEventsYear() {
@@ -846,6 +848,24 @@ function renderRegularSchedule() {
     item.append(label, button);
     return item;
   }));
+  renderScheduleProjection();
+}
+
+function renderScheduleProjection() {
+  const projection = calculateScheduleProjection(selectedEventsYear(), loadRegularSchedule(), loadAnnualEvents());
+  document.querySelector("#projection-planned").textContent = `${projection.plannedCount}時間`;
+  document.querySelector("#projection-excluded").textContent = `${projection.excludedCount}時間`;
+  document.querySelector("#projection-available").textContent = `${projection.availableCount}時間`;
+  projectionTableBody.replaceChildren(...projection.excludedSessions.map((session) => {
+    const row = document.createElement("tr");
+    [formatEventDateRange(session.date), session.weekday, `${session.period}限`, session.eventTitles.join("／")].forEach((value) => {
+      const cell = document.createElement("td");
+      cell.textContent = value;
+      row.append(cell);
+    });
+    return row;
+  }));
+  projectionEmpty.hidden = projection.excludedSessions.length > 0;
 }
 
 function populateScheduleSubjects(preferredCourseId) {
@@ -896,6 +916,7 @@ function renderAnnualEvents() {
   eventsTableBody.replaceChildren(...events.map(createEventRow));
   eventsEmpty.hidden = events.length > 0;
   document.querySelector("#events-list-description").textContent = `${SCHOOLS[eventsSchool.value].name}・${year}年度（${events.length}件）を日付順に表示しています。`;
+  renderScheduleProjection();
 }
 
 function changeEventsContext() {
