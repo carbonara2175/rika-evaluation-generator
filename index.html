@@ -5,13 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="学習指導要領の項目から、物理基礎・物理の3観点の評価規準を作成します。">
     <title>理科 評価規準ジェネレーター</title>
-    <link rel="stylesheet" href="style.css?v=1.6.0">
+    <link rel="stylesheet" href="style.css?v=1.6.1">
     <script src="https://cdn.jsdelivr.net/npm/pizzip@3.2.0/dist/pizzip.min.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/docxtemplater@3.62.0/build/docxtemplater.js" defer></script>
     <script src="annual-hours.js?v=1.5.1" defer></script>
     <script src="annual-events.js?v=1.0.0" defer></script>
-    <script src="regular-schedule.js?v=1.0.0" defer></script>
-    <script src="script.js?v=1.6.0" defer></script>
+    <script src="regular-schedule.js?v=1.1.0" defer></script>
+    <script src="script.js?v=1.6.1" defer></script>
   </head>
   <body>
     <header class="site-header">
@@ -215,6 +215,19 @@
           <div class="events-table-wrap">
             <table class="events-table"><thead><tr><th>日付</th><th>行事名</th><th>区分</th><th>通常授業</th><th>メモ</th><th>操作</th></tr></thead><tbody id="events-table-body"></tbody></table>
             <p id="events-empty" class="events-empty">この学校・年度の行事はまだ登録されていません。</p>
+          </div>
+        </section>
+
+        <section class="schedule-projection-section" aria-labelledby="schedule-projection-heading">
+          <div class="section-heading"><span class="step-number" aria-hidden="true">05</span><div><h2 id="schedule-projection-heading">授業実施見込み</h2><p>登録された通常時間割と年間行事に基づく見込みです。</p></div></div>
+          <div class="summary-grid schedule-projection-summary" aria-live="polite">
+            <article><span>通常時間割ベース予定</span><strong id="projection-planned">0時間</strong></article>
+            <article><span>年間行事による除外</span><strong id="projection-excluded">0時間</strong></article>
+            <article class="expected-card"><span>行事反映後の授業実施見込み</span><strong id="projection-available">0時間</strong></article>
+          </div>
+          <div class="events-table-wrap projection-table-wrap">
+            <table class="projection-table"><thead><tr><th>日付</th><th>曜日</th><th>時限</th><th>年間行事名（除外理由）</th></tr></thead><tbody id="projection-table-body"></tbody></table>
+            <p id="projection-empty" class="events-empty">除外される授業はありません。</p>
           </div>
         </section>
       </div>

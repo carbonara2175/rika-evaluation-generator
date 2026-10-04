@@ -37,4 +37,68 @@ function hasRegularScheduleSlot(slots, candidate) {
   return slots.some(({ dayOfWeek, period }) => dayOfWeek === candidate.dayOfWeek && period === candidate.period);
 }
 
-if (typeof module !== "undefined") module.exports = { REGULAR_SCHEDULE_DAYS, regularScheduleStorageKey, normalizeRegularSchedule, hasRegularScheduleSlot };
+// Date-only values are converted to UTC calendar parts deliberately. This avoids
+// parsing YYYY-MM-DD as an instant and then accidentally moving it to another day
+// when the browser applies its local time zone.
+function dateOnlyToUtc(value) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value));
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day ? date : null;
+}
+
+function utcDateOnly(date) {
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}-${String(date.getUTCDate()).padStart(2, "0")}`;
+}
+
+function calculateScheduleProjection(year, slots, events) {
+  const fiscalYear = Math.trunc(Number(year));
+  const normalizedSlots = normalizeRegularSchedule(slots);
+  const start = new Date(Date.UTC(fiscalYear, 3, 1));
+  const end = new Date(Date.UTC(fiscalYear + 1, 2, 31));
+  const unavailableByDate = new Map();
+
+  (Array.isArray(events) ? events : []).filter((event) => event?.regularClassesAvailable !== true).forEach((event) => {
+    const eventStart = dateOnlyToUtc(event?.startDate);
+    const eventEnd = dateOnlyToUtc(event?.endDate || event?.startDate);
+    if (!eventStart || !eventEnd || eventEnd < eventStart) return;
+    const rangeStart = eventStart < start ? start : eventStart;
+    const rangeEnd = eventEnd > end ? end : eventEnd;
+    for (const date = new Date(rangeStart); date <= rangeEnd; date.setUTCDate(date.getUTCDate() + 1)) {
+      const key = utcDateOnly(date);
+      if (!unavailableByDate.has(key)) unavailableByDate.set(key, new Set());
+      unavailableByDate.get(key).add(String(event.title || "名称未設定の行事"));
+    }
+  });
+
+  const dayIds = [null, "monday", "tuesday", "wednesday", "thursday", "friday", null];
+  const scheduledSessions = [];
+  const excludedSessions = [];
+  for (const date = new Date(start); date <= end; date.setUTCDate(date.getUTCDate() + 1)) {
+    const dayOfWeek = dayIds[date.getUTCDay()];
+    if (!dayOfWeek) continue;
+    const dateString = utcDateOnly(date);
+    normalizedSlots.filter((slot) => slot.dayOfWeek === dayOfWeek).forEach((slot) => {
+      const day = REGULAR_SCHEDULE_DAYS.find(({ id }) => id === dayOfWeek);
+      const session = { date: dateString, dayOfWeek, weekday: day.shortLabel, period: slot.period };
+      scheduledSessions.push(session);
+      const reasons = unavailableByDate.get(dateString);
+      if (reasons) excludedSessions.push({ ...session, eventTitles: [...reasons] });
+    });
+  }
+  return {
+    plannedCount: scheduledSessions.length,
+    excludedCount: excludedSessions.length,
+    availableCount: scheduledSessions.length - excludedSessions.length,
+    scheduledSessions,
+    excludedSessions
+  };
+}
+
+if (typeof module !== "undefined") module.exports = {
+  REGULAR_SCHEDULE_DAYS, regularScheduleStorageKey, normalizeRegularSchedule,
+  hasRegularScheduleSlot, dateOnlyToUtc, calculateScheduleProjection
+};
