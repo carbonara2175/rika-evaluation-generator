@@ -10,6 +10,7 @@
     <script src="https://cdn.jsdelivr.net/npm/docxtemplater@3.62.0/build/docxtemplater.js" defer></script>
     <script src="annual-hours.js?v=1.5.1" defer></script>
     <script src="annual-events.js?v=1.0.0" defer></script>
+    <script src="regular-schedule.js?v=1.0.0" defer></script>
     <script src="script.js?v=1.6.0" defer></script>
   </head>
   <body>
@@ -180,8 +181,24 @@
           </div>
         </section>
 
+        <section class="input-panel regular-schedule-panel" aria-labelledby="regular-schedule-heading">
+          <div class="section-heading"><span class="step-number" aria-hidden="true">02</span><div><h2 id="regular-schedule-heading">通常時間割</h2><p>この学校・年度で通常授業を行う科目と授業コマを登録します。</p></div></div>
+          <div class="schedule-subject-row">
+            <label class="field"><span>科目</span><select id="schedule-subject"></select></label>
+            <output id="schedule-weekly-hours" class="weekly-hours" aria-live="polite"><span>週時数</span><strong>0時間</strong></output>
+          </div>
+          <form id="schedule-form" class="schedule-add-row">
+            <label class="field"><span>曜日</span><select id="schedule-day"></select></label>
+            <label class="field"><span>時限</span><select id="schedule-period"></select></label>
+            <button class="copy-all-button" type="submit">追加</button>
+          </form>
+          <p id="schedule-message" class="schedule-message" role="status" aria-live="polite"></p>
+          <ul id="schedule-list" class="schedule-list"></ul>
+          <p id="schedule-empty" class="schedule-empty">この学校・年度・科目の授業コマはまだ登録されていません。</p>
+        </section>
+
         <section class="input-panel event-form-panel" aria-labelledby="event-form-heading">
-          <div class="section-heading"><span class="step-number" aria-hidden="true">02</span><div><h2 id="event-form-heading">行事を追加</h2><p>開始日・行事名・区分は必須です。</p></div></div>
+          <div class="section-heading"><span class="step-number" aria-hidden="true">03</span><div><h2 id="event-form-heading">行事を追加</h2><p>開始日・行事名・区分は必須です。</p></div></div>
           <form id="event-form" class="event-form-grid">
             <label class="field"><span>開始日 <b class="required">必須</b></span><input id="event-start-date" type="date" required></label>
             <label class="field"><span>終了日</span><input id="event-end-date" type="date"><small>未入力の場合は開始日と同じ日になります</small></label>
@@ -194,7 +211,7 @@
         </section>
 
         <section class="events-list-section" aria-labelledby="events-list-heading">
-          <div class="section-heading"><span class="step-number" aria-hidden="true">03</span><div><h2 id="events-list-heading">登録済みの行事</h2><p id="events-list-description">日付順に表示します。</p></div></div>
+          <div class="section-heading"><span class="step-number" aria-hidden="true">04</span><div><h2 id="events-list-heading">登録済みの行事</h2><p id="events-list-description">日付順に表示します。</p></div></div>
           <div class="events-table-wrap">
             <table class="events-table"><thead><tr><th>日付</th><th>行事名</th><th>区分</th><th>通常授業</th><th>メモ</th><th>操作</th></tr></thead><tbody id="events-table-body"></tbody></table>
             <p id="events-empty" class="events-empty">この学校・年度の行事はまだ登録されていません。</p>
