@@ -785,6 +785,14 @@ const eventSubmit = document.querySelector("#event-submit");
 const eventCancel = document.querySelector("#event-cancel");
 const eventsTableBody = document.querySelector("#events-table-body");
 const eventsEmpty = document.querySelector("#events-empty");
+const scheduleSubject = document.querySelector("#schedule-subject");
+const scheduleForm = document.querySelector("#schedule-form");
+const scheduleDay = document.querySelector("#schedule-day");
+const schedulePeriod = document.querySelector("#schedule-period");
+const scheduleList = document.querySelector("#schedule-list");
+const scheduleEmpty = document.querySelector("#schedule-empty");
+const scheduleMessage = document.querySelector("#schedule-message");
+const scheduleWeeklyHours = document.querySelector("#schedule-weekly-hours strong");
 let editingEventId = null;
 
 function selectedEventsYear() {
@@ -805,6 +813,47 @@ function saveAnnualEvents(events) {
     localStorage.setItem(annualEventsStorageKey(eventsSchool.value, selectedEventsYear()), JSON.stringify(sortAnnualEvents(events)));
     localStorage.setItem(EVENTS_SELECTION_KEY, JSON.stringify({ schoolId: eventsSchool.value, year: selectedEventsYear() }));
   } catch { /* Storage may be disabled by the browser. */ }
+}
+
+function scheduleStorageKey() {
+  return regularScheduleStorageKey(eventsSchool.value, selectedEventsYear(), scheduleSubject.value);
+}
+
+function loadRegularSchedule() {
+  try { return normalizeRegularSchedule(JSON.parse(localStorage.getItem(scheduleStorageKey()))); }
+  catch { return []; }
+}
+
+function saveRegularSchedule(slots) {
+  try { localStorage.setItem(scheduleStorageKey(), JSON.stringify(normalizeRegularSchedule(slots))); }
+  catch { /* Storage may be disabled by the browser. */ }
+}
+
+function renderRegularSchedule() {
+  const slots = loadRegularSchedule();
+  scheduleWeeklyHours.textContent = `${slots.length}時間`;
+  scheduleEmpty.hidden = slots.length > 0;
+  scheduleList.replaceChildren(...slots.map((slot) => {
+    const day = REGULAR_SCHEDULE_DAYS.find(({ id }) => id === slot.dayOfWeek);
+    const item = document.createElement("li");
+    const label = document.createElement("span");
+    label.textContent = `${day.label}　${slot.period}限`;
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = "削除";
+    button.dataset.day = slot.dayOfWeek;
+    button.dataset.period = slot.period;
+    item.append(label, button);
+    return item;
+  }));
+}
+
+function populateScheduleSubjects(preferredCourseId) {
+  const courses = SCHOOL_COURSES[eventsSchool.value] || {};
+  scheduleSubject.replaceChildren(...Object.entries(courses).map(([id, course]) => new Option(course.name, id)));
+  if (preferredCourseId && courses[preferredCourseId]) scheduleSubject.value = preferredCourseId;
+  scheduleMessage.textContent = "";
+  renderRegularSchedule();
 }
 
 function resetEventForm() {
@@ -852,6 +901,7 @@ function renderAnnualEvents() {
 function changeEventsContext() {
   resetEventForm();
   saveAnnualEvents(loadAnnualEvents());
+  populateScheduleSubjects(scheduleSubject.value);
   renderAnnualEvents();
 }
 
@@ -883,12 +933,43 @@ function initializeAnnualEvents() {
   try { selection = JSON.parse(localStorage.getItem(EVENTS_SELECTION_KEY)) || {}; } catch { /* Use defaults. */ }
   eventsSchool.value = SCHOOLS[selection.schoolId] ? selection.schoolId : "sanno";
   eventsYear.value = Number.isInteger(selection.year) ? selection.year : new Date().getFullYear();
+  scheduleDay.replaceChildren(...REGULAR_SCHEDULE_DAYS.map(({ id, label }) => new Option(label, id)));
+  schedulePeriod.replaceChildren(...Array.from({ length: 7 }, (_, index) => new Option(`${index + 1}限`, String(index + 1))));
+  populateScheduleSubjects();
   renderAnnualEvents();
 }
 
 eventsSchool.addEventListener("change", changeEventsContext);
 eventsYear.addEventListener("change", changeEventsContext);
 eventCancel.addEventListener("click", resetEventForm);
+scheduleSubject.addEventListener("change", () => {
+  scheduleMessage.textContent = "";
+  renderRegularSchedule();
+});
+scheduleForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const slots = loadRegularSchedule();
+  const candidate = { dayOfWeek: scheduleDay.value, period: Number(schedulePeriod.value) };
+  if (hasRegularScheduleSlot(slots, candidate)) {
+    scheduleMessage.textContent = "この授業コマはすでに登録されています";
+    scheduleMessage.classList.add("error");
+    return;
+  }
+  saveRegularSchedule([...slots, candidate]);
+  scheduleMessage.textContent = "授業コマを追加しました";
+  scheduleMessage.classList.remove("error");
+  renderRegularSchedule();
+});
+scheduleList.addEventListener("click", (event) => {
+  const button = event.target.closest("button[data-day]");
+  if (!button) return;
+  saveRegularSchedule(loadRegularSchedule().filter(({ dayOfWeek, period }) =>
+    dayOfWeek !== button.dataset.day || period !== Number(button.dataset.period)
+  ));
+  scheduleMessage.textContent = "授業コマを削除しました";
+  scheduleMessage.classList.remove("error");
+  renderRegularSchedule();
+});
 eventForm.addEventListener("submit", (event) => {
   event.preventDefault();
   eventTitle.setCustomValidity(eventTitle.value.trim() ? "" : "行事名を入力してください。");
