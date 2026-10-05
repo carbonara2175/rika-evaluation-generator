@@ -174,6 +174,88 @@ test("month header recognition uses the complete clustered line when labels are 
   assert.equal(result.cells.some((cell) => /月/.test(cell.text)), false);
 });
 
+function calendarWithMissingDayLabels(missingDays, rowY = (day) => 530 - (day - 1) * 15) {
+  const months = [4, 5, 6, 7, 8, 9, 10, 11, 12, 1, 2, 3];
+  const items = months.map((month, index) => positioned(`${month}月`, 55 + index * 70, 560, 18));
+  for (let day = 1; day <= 31; day += 1) {
+    const y = rowY(day);
+    if (!missingDays.includes(day)) items.push(positioned(String(day), 5, y));
+    months.forEach((month, index) => {
+      const text = month === 7 && day === 20 ? "海の日" : `行事${month}/${day}`;
+      items.push(positioned(text, 55 + index * 70, y, 40));
+    });
+  }
+  return { width: 910, height: 600, items };
+}
+
+test("Mito-style missing day labels 6, 20, and 27 restore all twelve months with Marine Day on July 20", () => {
+  const page = calendarWithMissingDayLabels([6, 20, 27]);
+  const result = restoreAnnualCalendar(page, 2026);
+  const complete = restoreAnnualCalendar(calendarWithMissingDayLabels([]), 2026);
+
+  assert.equal(result.ok, true);
+  assert.equal(result.debug.dayRowCandidates.length, 28);
+  assert.equal(result.debug.recognizedDayRowCount, 28);
+  assert.deepEqual(result.debug.interpolatedDayRows, [
+    { day: 6, y: 455 }, { day: 20, y: 245 }, { day: 27, y: 140 }
+  ]);
+  assert.equal(result.debug.recognizedDayRowCount + result.debug.interpolatedDayRows.length, 31);
+  assert.equal(result.dayRows.length, 31);
+  assert.deepEqual(result.monthHeaders, complete.monthHeaders);
+  assert.deepEqual(result.monthBoundaries, complete.monthBoundaries);
+  assert.deepEqual(result.dayRows, complete.dayRows);
+  assert.deepEqual(result.cells.map(({ date, text }) => [date, text]),
+    complete.cells.map(({ date, text }) => [date, text]));
+  // The 12 x 31 grid retains every valid fiscal-year date, excluding dates
+  // such as April 31 and February 30 just as the original restoration does.
+  assert.equal(result.cells.length, 365);
+  for (let month = 1; month <= 12; month += 1) {
+    const year = month >= 4 ? 2026 : 2027;
+    const days = new Date(Date.UTC(year, month, 0)).getUTCDate();
+    assert.equal(result.cells.filter((cell) => cell.month === month).length, days);
+  }
+  assert.equal(result.cells.find((cell) => cell.date === "2026-07-20").text, "海の日");
+  assert.equal(result.cells.filter((cell) => cell.text === "海の日").length, 1);
+  assert.equal(complete.debug.recognizedDayRowCount, 31);
+  assert.deepEqual(complete.debug.interpolatedDayRows, []);
+});
+
+test("missing day rows use local neighboring coordinates without moving recognized rows", () => {
+  // Each gap sits in a different local row spacing; a global fixed pitch
+  // would restore the later rows at the wrong coordinates.
+  const rowY = (day) => 530 - (day - 1) * 12 - Math.max(0, day - 10) * 2 - Math.max(0, day - 23) * 3;
+  const result = restoreAnnualCalendar(calendarWithMissingDayLabels([6, 20, 27], rowY), 2026);
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.debug.interpolatedDayRows,
+    [6, 20, 27].map((day) => ({ day, y: (rowY(day - 1) + rowY(day + 1)) / 2 })));
+  assert.deepEqual(result.dayRows, Array.from({ length: 31 }, (_, index) => ({ day: index + 1, y: rowY(index + 1) })));
+  assert.equal(result.cells.find((cell) => cell.text === "海の日").date, "2026-07-20");
+});
+
+test("consecutive missing labels are interpolated between the nearest recognized anchors", () => {
+  const result = restoreAnnualCalendar(calendarWithMissingDayLabels([19, 20, 21]), 2026);
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.debug.interpolatedDayRows, [
+    { day: 19, y: 260 }, { day: 20, y: 245 }, { day: 21, y: 230 }
+  ]);
+  assert.equal(result.cells.find((cell) => cell.text === "海の日").date, "2026-07-20");
+});
+
+test("missing edge rows and conflicting anchor coordinates are not guessed", () => {
+  for (const missing of [[1], [31], [1, 6, 20, 27, 31]]) {
+    const result = restoreAnnualCalendar(calendarWithMissingDayLabels(missing), 2026);
+    assert.equal(result.ok, false);
+    assert.equal(result.error, "日付行を正しく認識できませんでした");
+    assert.deepEqual(result.cells, []);
+    assert.equal(result.dayRows.some((row) => missing.includes(row.day) && [1, 31].includes(row.day)), false);
+  }
+  const conflicting = restoreAnnualCalendar(calendarWithMissingDayLabels([6, 20, 27],
+    (day) => day === 7 ? 475 : 530 - (day - 1) * 15), 2026);
+  assert.equal(conflicting.ok, false);
+  assert.deepEqual(conflicting.debug.interpolatedDayRows, []);
+  assert.deepEqual(conflicting.cells, []);
+});
+
 test("calendar restoration fails safely when headers or rows are incomplete", () => {
   const empty = restoreAnnualCalendar({ width: 800, height: 600, items: [] }, 2026);
   assert.equal(empty.ok, false);

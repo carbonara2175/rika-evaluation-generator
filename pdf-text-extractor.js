@@ -128,6 +128,27 @@ function findDayRows(items) {
   }).filter(Boolean);
 }
 
+/** Fill internal day-label gaps using the nearest recognized rows on both sides. */
+function interpolateDayRows(recognizedRows) {
+  // PDF coordinates descend as day numbers increase. Do not infer positions
+  // from conflicting anchors, or extrapolate a missing first/last row.
+  if (recognizedRows.some((row, index) => !Number.isFinite(row.y)
+    || (index > 0 && row.y >= recognizedRows[index - 1].y))) return recognizedRows;
+  const rows = [];
+  recognizedRows.forEach((row, index) => {
+    const previous = recognizedRows[index - 1];
+    if (previous) {
+      for (let day = previous.day + 1; day < row.day; day += 1) {
+        const fraction = (day - previous.day) / (row.day - previous.day);
+        rows.push({ day, y: previous.y + (row.y - previous.y) * fraction,
+          sources: [], interpolated: true });
+      }
+    }
+    rows.push(row);
+  });
+  return rows;
+}
+
 function splitPositionedItem(item) {
   const text = String(item.text ?? "");
   const tokens = [...text.matchAll(/\S+/g)];
@@ -183,7 +204,10 @@ function restoreAnnualCalendar(page, fiscalYear) {
   debug.monthHeaderLine = recognizedHeader.text;
   debug.monthHeaderCandidates = recognizedHeader.text ? [recognizedHeader.text] : [];
   if (monthHeaders.length !== 12) return { ok: false, error: "月列を正しく認識できませんでした", monthHeaders, dayRows: [], cells: [], debug };
-  const dayRows = findDayRows(items);
+  const recognizedDayRows = findDayRows(items);
+  const dayRows = interpolateDayRows(recognizedDayRows);
+  debug.recognizedDayRowCount = recognizedDayRows.length;
+  debug.interpolatedDayRows = dayRows.filter((row) => row.interpolated).map(({ day, y }) => ({ day, y }));
   if (dayRows.length !== 31) return {
     ok: false,
     error: "日付行を正しく認識できませんでした",
@@ -364,6 +388,9 @@ function initializePdfImport() {
           + `\n月ヘッダー行: ${page.debug.monthHeaderLine || "認識なし"}`
           + `\n日付行候補として検出した先頭文字列: ${page.debug.dayRowCandidates.join(" | ") || "なし"}`
           + `\n認識月数: ${page.monthHeaders.length}\n認識日付行数: ${page.dayRows.length}`
+          + `\n直接認識日付行数: ${page.debug.recognizedDayRowCount ?? 0}`
+          + `\n補完日付行数: ${page.debug.interpolatedDayRows?.length ?? 0}`
+          + `\n補完日付行: ${page.debug.interpolatedDayRows?.map((row) => `${row.day}日 y=${row.y.toFixed(1)}`).join(", ") || "なし"}`
           + `\n各月中心x:\n${months ? page.monthHeaders.map((header) => `${header.month}月 x=${header.x.toFixed(1)}`).join("\n") : "認識なし"}`
           + `\n日付行: ${days || "認識なし"}`;
       }).join("\n\n");
