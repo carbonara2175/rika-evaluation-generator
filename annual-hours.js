@@ -47,7 +47,24 @@ function selectExpectedHours(eventProjection, fallbackHours) {
   };
 }
 
-// Build one subject-wide timeline from the existing curriculum order. Only
+// Keep a saved teaching order usable when curriculum definitions gain or lose
+// units: retain known saved IDs, then append newly defined units in their
+// existing curriculum order.
+function reconcileTeachingOrder(definedUnits, savedOrder) {
+  const units = Array.isArray(definedUnits) ? definedUnits : [];
+  const knownIds = new Set(units.map((unit) => unit?.id).filter(Boolean));
+  const result = [];
+  (Array.isArray(savedOrder) ? savedOrder : []).forEach((id) => {
+    if (knownIds.has(id) && !result.includes(id)) result.push(id);
+  });
+  units.forEach((unit) => {
+    if (unit?.id && !result.includes(unit.id)) result.push(unit.id);
+  });
+  return result;
+}
+
+// Build one subject-wide timeline from the supplied order (curriculum order by
+// default, or the school's saved teaching order). Only
 // rows actually present in saved plans are included; missing lessons are never
 // invented to make the allocation add up.
 function buildUnitLessonTimeline(orderedUnits, savedPlans) {
@@ -89,5 +106,5 @@ if (typeof module !== "undefined") module.exports = {
   calculateAnnualHours, calculateExpectedHours, calculateProportionalAllocation,
   allocateByLargestRemainder, calculateUnitHoursTotal, calculateOperationalDifference,
   annualEventReferenceYearStorageKey, selectExpectedHours, buildUnitLessonTimeline,
-  endpointId, findAutomaticExamRange, calculateExamRangeDifference
+  endpointId, findAutomaticExamRange, calculateExamRangeDifference, reconcileTeachingOrder
 };

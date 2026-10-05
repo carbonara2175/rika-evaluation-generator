@@ -573,6 +573,7 @@ const LEGACY_PLAN_STORAGE_PREFIX = "rika-unit-plan-v1:";
 const PLAN_LAST_UNIT_PREFIX = "rika-unit-plan-last-unit-v2:";
 const PLAN_USER_INFO_KEY = "rika-unit-plan-user-info-v1";
 const EXAM_RANGE_STORAGE_PREFIX = "rika-exam-range-v1:";
+const TEACHING_ORDER_STORAGE_PREFIX = "rika-teaching-order-v1:";
 const planSchool = document.querySelector("#plan-school");
 const planSubject = document.querySelector("#plan-subject");
 const planUnit = document.querySelector("#plan-unit");
@@ -581,6 +582,9 @@ const allocatedHoursInput = document.querySelector("#allocated-hours");
 const affiliationInput = document.querySelector("#affiliation");
 const teacherNameInput = document.querySelector("#teacher-name");
 const lessonRows = document.querySelector("#lesson-rows");
+const teachingOrderList = document.querySelector("#teaching-order-list");
+const teachingOrderEmpty = document.querySelector("#teaching-order-empty");
+const resetTeachingOrderButton = document.querySelector("#reset-teaching-order");
 const evaluationValues = ["", "formative", "summative"];
 
 function planSubjectData() {
@@ -605,6 +609,51 @@ function planStorageKey() {
   return `${PLAN_STORAGE_PREFIX}${planSchool.value}__${planSubject.value}__${planUnitData().id}`;
 }
 
+function teachingOrderStorageKey(schoolId = planSchool.value, courseId = planSubject.value) {
+  return `${TEACHING_ORDER_STORAGE_PREFIX}${schoolId}:${courseId}`;
+}
+
+function teachingOrderIds() {
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem(teachingOrderStorageKey())); }
+  catch { /* Invalid or unavailable storage falls back to curriculum order. */ }
+  return reconcileTeachingOrder(planUnits(), saved);
+}
+
+function unitsInTeachingOrder() {
+  const byId = new Map(planUnits().map((unit) => [unit.id, unit]));
+  return teachingOrderIds().map((id) => byId.get(id)).filter(Boolean);
+}
+
+function saveTeachingOrder(order) {
+  localStorage.setItem(teachingOrderStorageKey(), JSON.stringify(reconcileTeachingOrder(planUnits(), order)));
+}
+
+function renderTeachingOrder() {
+  if (!teachingOrderList || !teachingOrderEmpty || !resetTeachingOrderButton) return;
+  const units = unitsInTeachingOrder();
+  teachingOrderList.replaceChildren(...units.map((unit, index) => {
+    const item = document.createElement("li");
+    item.className = "teaching-order-item";
+    item.dataset.unitId = unit.id;
+    const name = document.createElement("strong");
+    name.textContent = unit.unit;
+    const buttons = document.createElement("div");
+    buttons.className = "teaching-order-buttons";
+    const up = document.createElement("button");
+    up.type = "button"; up.dataset.direction = "up"; up.textContent = "↑ 上へ"; up.disabled = index === 0;
+    up.setAttribute("aria-label", `${unit.unit}を上へ移動`);
+    const down = document.createElement("button");
+    down.type = "button"; down.dataset.direction = "down"; down.textContent = "↓ 下へ"; down.disabled = index === units.length - 1;
+    down.setAttribute("aria-label", `${unit.unit}を下へ移動`);
+    buttons.append(up, down);
+    item.append(name, buttons);
+    return item;
+  }));
+  teachingOrderEmpty.hidden = units.length > 0;
+  resetTeachingOrderButton.hidden = units.length === 0;
+}
+
 function unitHoursTotal(schoolId, courseId) {
   const prefix = `${PLAN_STORAGE_PREFIX}${schoolId}__${courseId}__`;
   const plans = [];
@@ -619,8 +668,8 @@ function unitHoursTotal(schoolId, courseId) {
   return calculateUnitHoursTotal(plans);
 }
 
-function savedPlansInCurriculumOrder() {
-  const units = planUnits();
+function savedPlansInTeachingOrder() {
+  const units = unitsInTeachingOrder();
   const orderedUnits = units.length ? units : [planUnitData()];
   const plans = orderedUnits.map((unit) => {
     try {
@@ -668,7 +717,7 @@ function renderExamRanges() {
   const year = planReferenceYear();
   context.textContent = `${SCHOOLS[planSchool.value]?.name || "選択中の学校"}・${planSubjectData().name}・${year}年度（年間行事参照年度）`;
   const projection = planExamProjection(year);
-  const { orderedUnits, plans } = savedPlansInCurriculumOrder();
+  const { orderedUnits, plans } = savedPlansInTeachingOrder();
   const { lessons, warnings } = buildUnitLessonTimeline(orderedUnits, plans);
   const notices = [...warnings];
   if (!projection.hasRegularSchedule) notices.unshift("通常時間割が登録されていないため算出できません");
@@ -861,6 +910,7 @@ function renderUnitPlan() {
   }));
   renderLessonRows(plan);
   renderUnitHoursTotal();
+  renderTeachingOrder();
   renderExamRanges();
 }
 
@@ -926,6 +976,26 @@ planSchool.addEventListener("change", () => populatePlanCourses());
 planSubject.addEventListener("change", () => populatePlanCourses(planSubject.value));
 planUnit.addEventListener("change", renderUnitPlan);
 planCustomUnit.addEventListener("change", renderUnitPlan);
+teachingOrderList.addEventListener("click", (event) => {
+  const button = event.target.closest("button[data-direction]");
+  const item = button?.closest(".teaching-order-item");
+  if (!button || !item) return;
+  const order = teachingOrderIds();
+  const from = order.indexOf(item.dataset.unitId);
+  const to = from + (button.dataset.direction === "up" ? -1 : 1);
+  if (from < 0 || to < 0 || to >= order.length) return;
+  [order[from], order[to]] = [order[to], order[from]];
+  saveTeachingOrder(order);
+  renderTeachingOrder();
+  renderExamRanges();
+});
+resetTeachingOrderButton.addEventListener("click", () => {
+  if (!window.confirm("単元の授業実施順を現在の既定順に戻しますか？単元指導計画の内容は変更されません。")) return;
+  localStorage.removeItem(teachingOrderStorageKey());
+  renderTeachingOrder();
+  renderExamRanges();
+  showToast("授業実施順を初期順に戻しました");
+});
 affiliationInput.addEventListener("input", saveUserInfo);
 teacherNameInput.addEventListener("input", saveUserInfo);
 allocatedHoursInput.addEventListener("change", () => {

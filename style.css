@@ -240,6 +240,16 @@ textarea:focus-visible { outline: 3px solid rgba(38, 113, 166, .28); outline-off
 .evaluation-toggle { width: 42px; height: 42px; padding: 0; color: var(--blue); background: var(--blue-soft); border: 1px solid #9ab6c8; border-radius: 7px; font-family: inherit; font-size: 1.3rem; font-weight: 700; cursor: pointer; }
 .evaluation-toggle.summative, .evaluation-toggle[data-value="summative"] { color: #fff; background: var(--navy); }
 .unit-plan-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
+.teaching-order-section { padding: 28px; background: #fff; border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
+.teaching-order-list { display: grid; gap: 8px; margin: 20px 0 0; padding: 0; list-style: none; counter-reset: teaching-order; }
+.teaching-order-item { display: grid; grid-template-columns: 38px minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 10px 12px; background: #f8fafb; border: 1px solid var(--line); border-radius: 7px; counter-increment: teaching-order; }
+.teaching-order-item::before { content: counter(teaching-order); display: grid; width: 30px; height: 30px; place-items: center; color: #fff; background: var(--navy); border-radius: 50%; font-size: .8rem; font-weight: 700; }
+.teaching-order-item strong { color: var(--navy); }
+.teaching-order-buttons { display: flex; gap: 6px; }
+.teaching-order-buttons button { min-width: 68px; padding: 7px 10px; color: var(--blue); background: #fff; border: 1px solid #9ab6c8; border-radius: 5px; font: inherit; font-size: .8rem; font-weight: 700; cursor: pointer; }
+.teaching-order-buttons button:disabled { color: var(--muted); background: #eef1f3; border-color: var(--line); cursor: not-allowed; }
+.teaching-order-actions { display: flex; justify-content: flex-end; margin-top: 14px; }
+.teaching-order-empty { margin: 20px 0 0; color: var(--muted); }
 .mobile-label { display: none; }
 .exam-range-section { padding-top: 32px; border-top: 1px solid var(--line); }
 .exam-range-context { margin: 16px 0; color: var(--muted); font-size: .88rem; font-weight: 700; }
@@ -290,6 +300,9 @@ textarea:focus-visible { outline: 3px solid rgba(38, 113, 166, .28); outline-off
   .evaluation-legend { align-items: flex-start; flex-direction: column; gap: 3px; }
   .unit-plan-actions { align-items: stretch; flex-direction: column; }
   .unit-plan-actions button { width: 100%; }
+  .teaching-order-section { padding: 22px 18px; }
+  .teaching-order-item { grid-template-columns: 32px minmax(0, 1fr); }
+  .teaching-order-buttons { grid-column: 1 / -1; justify-content: flex-end; }
   .exam-range-metrics { grid-template-columns: 1fr 1fr; }
   .exam-range-controls { grid-template-columns: 1fr; }
   .exam-range-controls button { width: 100%; }
