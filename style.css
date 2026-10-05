@@ -159,6 +159,9 @@ tfoot th, tfoot td { border-bottom: 0; }
 .year-input { position: relative; }
 .year-input input { padding-right: 55px; }
 .year-input small { position: absolute; top: 50%; right: 14px; color: var(--muted); transform: translateY(-50%); }
+.holiday-bulk-action { display: flex; grid-column: 1 / -1; align-items: center; gap: 14px; }
+.holiday-bulk-action button { min-height: 48px; }
+.holiday-bulk-action p { margin: 0; color: var(--success); font-size: .82rem; font-weight: 700; }
 .event-form-panel { margin-top: 20px; }
 .event-form-grid { display: grid; grid-template-columns: repeat(4, 1fr); align-items: start; gap: 18px 20px; margin-top: 24px; }
 .required { display: inline-block; margin-left: 5px; padding: 1px 5px; color: #9b2c2c; background: #fff1f1; border-radius: 3px; font-size: .64rem; }
@@ -243,6 +246,7 @@ textarea:focus-visible { outline: 3px solid rgba(38, 113, 166, .28); outline-off
   .objective-text p { line-height: 1.9; }
   .output-heading-row { align-items: stretch; flex-direction: column; }
   .copy-all-button { width: 100%; }
+  .holiday-bulk-action { align-items: stretch; flex-direction: column; }
   .criterion-card { min-height: 0; }
   .criterion-card h3 { min-height: 0; }
   .annual-form-grid { grid-template-columns: 1fr 1fr; }
