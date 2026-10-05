@@ -10,6 +10,14 @@ const REGULAR_SCHEDULE_DAYS = [
   { id: "friday", label: "金曜日", shortLabel: "金" }
 ];
 
+const ANNUAL_EVENT_CATEGORY_TITLES = {
+  school_event: "学校行事",
+  exam: "考査",
+  holiday: "休業日",
+  long_break: "長期休業",
+  other: "その他"
+};
+
 function regularScheduleStorageKey(schoolId, year, courseId) {
   return `rika-regular-schedule-v1:${schoolId}:${year}:${courseId}`;
 }
@@ -70,7 +78,9 @@ function calculateScheduleProjection(year, slots, events) {
     for (const date = new Date(rangeStart); date <= rangeEnd; date.setUTCDate(date.getUTCDate() + 1)) {
       const key = utcDateOnly(date);
       if (!unavailableByDate.has(key)) unavailableByDate.set(key, new Set());
-      unavailableByDate.get(key).add(String(event.title || "名称未設定の行事"));
+      unavailableByDate.get(key).add(
+        String(event.title || "").trim() || ANNUAL_EVENT_CATEGORY_TITLES[event.category] || ANNUAL_EVENT_CATEGORY_TITLES.other
+      );
     }
   });
 

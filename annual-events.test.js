@@ -2,7 +2,10 @@
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { annualEventsStorageKey, normalizeAnnualEvent, sortAnnualEvents, formatEventDateRange } = require("./annual-events");
+const {
+  annualEventsStorageKey, normalizeAnnualEvent, annualEventDisplayTitle,
+  sortAnnualEvents, formatEventDateRange
+} = require("./annual-events");
 
 test("storage keys completely separate schools and years", () => {
   assert.equal(annualEventsStorageKey("sanno", 2027), "rika-annual-events-v1:sanno:2027");
@@ -14,6 +17,13 @@ test("an omitted end date becomes a one-day event", () => {
   const event = normalizeAnnualEvent({ id: "1", startDate: "2027-05-18", title: "考査", category: "exam" });
   assert.equal(event.endDate, "2027-05-18");
   assert.equal(event.regularClassesAvailable, false);
+});
+
+test("an omitted title is preserved and displayed using its category", () => {
+  const event = normalizeAnnualEvent({ startDate: "2027-05-18", title: "", category: "exam" });
+  assert.equal(event.title, "");
+  assert.equal(annualEventDisplayTitle(event), "考査");
+  assert.equal(annualEventDisplayTitle({ title: "体育祭", category: "school_event" }), "体育祭");
 });
 
 test("events are sorted by their start date", () => {

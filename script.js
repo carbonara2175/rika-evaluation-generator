@@ -879,6 +879,7 @@ function populateScheduleSubjects(preferredCourseId) {
 function resetEventForm() {
   editingEventId = null;
   eventForm.reset();
+  eventEndDate.setCustomValidity("");
   eventSubmit.textContent = "行事を追加";
   eventCancel.hidden = true;
   document.querySelector("#event-form-heading").textContent = "行事を追加";
@@ -888,7 +889,7 @@ function createEventRow(item) {
   const row = document.createElement("tr");
   const values = [
     formatEventDateRange(item.startDate, item.endDate),
-    item.title,
+    annualEventDisplayTitle(item),
     ANNUAL_EVENT_CATEGORIES[item.category],
     item.regularClassesAvailable ? "実施できる" : "実施できない",
     item.memo || "－"
@@ -993,7 +994,6 @@ scheduleList.addEventListener("click", (event) => {
 });
 eventForm.addEventListener("submit", (event) => {
   event.preventDefault();
-  eventTitle.setCustomValidity(eventTitle.value.trim() ? "" : "行事名を入力してください。");
   eventEndDate.setCustomValidity(eventEndDate.value && eventEndDate.value < eventStartDate.value ? "終了日は開始日以降の日付を指定してください。" : "");
   if (!eventForm.reportValidity()) return;
   const item = normalizeAnnualEvent({
@@ -1014,8 +1014,15 @@ eventForm.addEventListener("submit", (event) => {
   renderAnnualEvents();
   showToast(existingIndex >= 0 ? "行事を更新しました" : "行事を追加しました");
 });
-eventTitle.addEventListener("input", () => eventTitle.setCustomValidity(""));
-eventEndDate.addEventListener("input", () => eventEndDate.setCustomValidity(""));
+function validateEventDateRange() {
+  eventEndDate.setCustomValidity(eventEndDate.value && eventEndDate.value < eventStartDate.value ? "終了日は開始日以降の日付を指定してください。" : "");
+}
+
+eventStartDate.addEventListener("change", () => {
+  if (eventStartDate.value && !eventEndDate.value) eventEndDate.value = eventStartDate.value;
+  validateEventDateRange();
+});
+eventEndDate.addEventListener("input", validateEventDateRange);
 eventsTableBody.addEventListener("click", (event) => {
   const button = event.target.closest("button[data-action]");
   if (!button) return;
@@ -1024,7 +1031,7 @@ eventsTableBody.addEventListener("click", (event) => {
     return;
   }
   const item = loadAnnualEvents().find(({ id }) => id === button.dataset.id);
-  if (!item || !window.confirm(`「${item.title}」を削除しますか？`)) return;
+  if (!item || !window.confirm(`「${annualEventDisplayTitle(item)}」を削除しますか？`)) return;
   saveAnnualEvents(loadAnnualEvents().filter(({ id }) => id !== item.id));
   if (editingEventId === item.id) resetEventForm();
   renderAnnualEvents();

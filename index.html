@@ -9,9 +9,9 @@
     <script src="https://cdn.jsdelivr.net/npm/pizzip@3.2.0/dist/pizzip.min.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/docxtemplater@3.62.0/build/docxtemplater.js" defer></script>
     <script src="annual-hours.js?v=1.5.1" defer></script>
-    <script src="annual-events.js?v=1.0.0" defer></script>
-    <script src="regular-schedule.js?v=1.1.0" defer></script>
-    <script src="script.js?v=1.6.1" defer></script>
+    <script src="annual-events.js?v=1.0.1" defer></script>
+    <script src="regular-schedule.js?v=1.1.1" defer></script>
+    <script src="script.js?v=1.6.2" defer></script>
   </head>
   <body>
     <header class="site-header">
@@ -198,11 +198,11 @@
         </section>
 
         <section class="input-panel event-form-panel" aria-labelledby="event-form-heading">
-          <div class="section-heading"><span class="step-number" aria-hidden="true">03</span><div><h2 id="event-form-heading">行事を追加</h2><p>開始日・行事名・区分は必須です。</p></div></div>
+          <div class="section-heading"><span class="step-number" aria-hidden="true">03</span><div><h2 id="event-form-heading">行事を追加</h2><p>開始日・区分は必須です。</p></div></div>
           <form id="event-form" class="event-form-grid">
             <label class="field"><span>開始日 <b class="required">必須</b></span><input id="event-start-date" type="date" required></label>
             <label class="field"><span>終了日</span><input id="event-end-date" type="date"><small>未入力の場合は開始日と同じ日になります</small></label>
-            <label class="field event-title-field"><span>行事名 <b class="required">必須</b></span><input id="event-title" type="text" maxlength="100" required placeholder="例：1学期中間考査"></label>
+            <label class="field event-title-field"><span>行事名</span><input id="event-title" type="text" maxlength="100" placeholder="例：1学期中間考査（未入力時は区分名を表示）"></label>
             <label class="field"><span>区分 <b class="required">必須</b></span><select id="event-category" required></select></label>
             <label class="checkbox-field"><input id="event-classes-available" type="checkbox"><span>通常授業を実施できる</span></label>
             <label class="field event-memo-field"><span>メモ</span><textarea id="event-memo" rows="2" maxlength="500" placeholder="補足事項があれば入力"></textarea></label>

@@ -25,6 +25,12 @@ function normalizeAnnualEvent(event) {
   };
 }
 
+function annualEventDisplayTitle(event) {
+  const title = String(event?.title || "").trim();
+  const category = ANNUAL_EVENT_CATEGORIES[event?.category] || ANNUAL_EVENT_CATEGORIES.other;
+  return title || category;
+}
+
 function sortAnnualEvents(events) {
   return events.map(normalizeAnnualEvent).sort((a, b) =>
     a.startDate.localeCompare(b.startDate) || a.endDate.localeCompare(b.endDate) || a.title.localeCompare(b.title, "ja")
@@ -39,4 +45,7 @@ function formatEventDateRange(startDate, endDate = startDate) {
   return startDate === endDate ? format(startDate) : `${format(startDate)} ～ ${format(endDate)}`;
 }
 
-if (typeof module !== "undefined") module.exports = { ANNUAL_EVENT_CATEGORIES, annualEventsStorageKey, normalizeAnnualEvent, sortAnnualEvents, formatEventDateRange };
+if (typeof module !== "undefined") module.exports = {
+  ANNUAL_EVENT_CATEGORIES, annualEventsStorageKey, normalizeAnnualEvent,
+  annualEventDisplayTitle, sortAnnualEvents, formatEventDateRange
+};
