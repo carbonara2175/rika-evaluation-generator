@@ -135,6 +135,7 @@ const weeklyHoursInput = document.querySelector("#weekly-hours");
 const actualHoursInput = document.querySelector("#actual-hours");
 const monthInputs = document.querySelector("#month-inputs");
 const annualEventsReferenceYear = document.querySelector("#annual-events-reference-year");
+let annualManualDays = MONTHS.map(() => 0);
 
 function selectedSubject() {
   return SUBJECTS.find(({ subject }) => subject === subjectSelect.value) || SUBJECTS[0];
@@ -309,6 +310,19 @@ function annualEventProjection() {
   };
 }
 
+function annualEventAvailableDays() {
+  const { schoolId } = annualIds();
+  const year = selectedAnnualEventsReferenceYear();
+  let events = [];
+  try {
+    const saved = JSON.parse(localStorage.getItem(annualEventsStorageKey(schoolId, year)));
+    events = Array.isArray(saved) ? sortAnnualEvents(saved) : [];
+  } catch { /* Invalid or unavailable storage is treated as missing data. */ }
+  return events.length
+    ? { ...calculateMonthlyAvailableSchoolDays(year, events), automatic: true }
+    : { days: [...annualManualDays], details: [], automatic: false };
+}
+
 function annualPreset() {
   const school = SCHOOLS[annualSchool.value] || SCHOOLS.sanno;
   return school.courses[annualSubject.value] || Object.values(school.courses)[0];
@@ -325,7 +339,7 @@ function annualState() {
     credits: Math.min(10, Math.max(1, Math.trunc(Number(creditsInput.value) || 1))),
     weeklyHours: Math.max(0, Number(weeklyHoursInput.value) || 0),
     actualHours,
-    days: [...monthInputs.querySelectorAll("input")].map((input) => Math.max(0, Math.trunc(Number(input.value) || 0)))
+    days: [...annualManualDays]
   };
 }
 
@@ -356,18 +370,20 @@ function applyAnnualState(resetToPreset = false) {
   const saved = resetToPreset ? null : loadStoredAnnualState();
   creditsInput.value = saved?.credits ?? preset.credits;
   weeklyHoursInput.value = saved?.weeklyHours ?? preset.weeklyHours;
-  [...monthInputs.querySelectorAll("input")].forEach((input, index) => { input.value = saved?.days?.[index] ?? 0; });
+  annualManualDays = MONTHS.map((_, index) => Math.max(0, Math.trunc(Number(saved?.days?.[index]) || 0)));
   annualEventsReferenceYear.value = loadAnnualEventsReferenceYear();
 }
 
 function renderAnnual() {
   const state = annualState();
+  const availableDays = annualEventAvailableDays();
+  const effectiveDays = availableDays.days;
   const annualHours = calculateAnnualHours(state.credits);
-  const totalDays = state.days.reduce((sum, value) => sum + value, 0);
+  const totalDays = effectiveDays.reduce((sum, value) => sum + value, 0);
   const rawProjectedHours = calculateExpectedHours(totalDays, state.weeklyHours);
   const expected = selectExpectedHours(annualEventProjection(), rawProjectedHours);
   const rawDifference = calculateOperationalDifference(expected.hours, state.actualHours);
-  const allocations = allocateByLargestRemainder(annualHours, state.days);
+  const allocations = allocateByLargestRemainder(annualHours, effectiveDays);
   const allocated = allocations.reduce((sum, value) => sum + value, 0);
   const marginHours = annualHours - state.actualHours;
   document.querySelector("#standard-hours").value = `${annualHours}時間`;
@@ -384,9 +400,19 @@ function renderAnnual() {
   document.querySelector("#summary-difference").textContent = `${Math.round(Math.abs(rawDifference))}時間`;
   document.querySelector("#difference-card").classList.toggle("shortage", rawDifference < 0);
   document.querySelector("#summary-allocation").textContent = `${allocated} / ${annualHours}時間`;
+  document.querySelector("#monthly-days-source").textContent = availableDays.automatic
+    ? `${selectedAnnualEventsReferenceYear()}年度の年間行事から自動算出`
+    : "年間行事データ未設定のため手入力値を使用";
+  [...monthInputs.querySelectorAll("input")].forEach((input, index) => {
+    input.value = effectiveDays[index];
+    input.readOnly = availableDays.automatic;
+    input.title = availableDays.automatic
+      ? `平日数：${availableDays.details[index].weekdays}日、除外：${availableDays.details[index].excluded}日`
+      : "年間行事データがない場合に使用する手入力値";
+  });
   document.querySelector("#annual-table-body").replaceChildren(...MONTHS.map((month, index) => {
     const row = document.createElement("tr");
-    row.innerHTML = `<th scope="row">${month}</th><td>${state.days[index]}日</td><td>${calculateExpectedHours(state.days[index], state.weeklyHours).toFixed(1)}h</td><td><strong>${allocations[index]}h</strong></td>`;
+    row.innerHTML = `<th scope="row">${month}</th><td>${effectiveDays[index]}日</td><td>${calculateExpectedHours(effectiveDays[index], state.weeklyHours).toFixed(1)}h</td><td><strong>${allocations[index]}h</strong></td>`;
     return row;
   }));
   document.querySelector("#annual-table-foot").innerHTML = `<tr><th scope="row">合計</th><td>${totalDays}日</td><td>${rawProjectedHours.toFixed(1)}h</td><td>${allocated}h</td></tr>`;
@@ -396,7 +422,7 @@ function renderAnnual() {
 
 function allocationText() {
   const state = annualState();
-  const allocations = allocateByLargestRemainder(calculateAnnualHours(state.credits), state.days);
+  const allocations = allocateByLargestRemainder(calculateAnnualHours(state.credits), annualEventAvailableDays().days);
   return `${MONTHS.map((month, index) => `${month}：${allocations[index]}時間`).join("\n")}\n\n合計：${allocations.reduce((sum, value) => sum + value, 0)}時間`;
 }
 
@@ -455,16 +481,24 @@ annualSubject.addEventListener("change", () => { applyAnnualState(); renderAnnua
   renderAnnual();
 }));
 [creditsInput, weeklyHoursInput, customSchoolName, customSubjectName].forEach((input) => input.addEventListener("input", renderAnnual));
-monthInputs.addEventListener("input", renderAnnual);
+monthInputs.addEventListener("input", (event) => {
+  if (event.target.matches("input") && !event.target.readOnly) {
+    annualManualDays[Number(event.target.dataset.month)] = Math.max(0, Math.trunc(Number(event.target.value) || 0));
+  }
+  renderAnnual();
+});
 monthInputs.addEventListener("change", (event) => {
-  if (event.target.matches("input")) event.target.value = Math.max(0, Math.trunc(Number(event.target.value) || 0));
+  if (event.target.matches("input") && !event.target.readOnly) {
+    event.target.value = Math.max(0, Math.trunc(Number(event.target.value) || 0));
+    annualManualDays[Number(event.target.dataset.month)] = Number(event.target.value);
+  }
   renderAnnual();
 });
 document.querySelector("#copy-allocation").addEventListener("click", () => copyText(allocationText()));
 document.querySelector("#copy-annual-result").addEventListener("click", () => {
   const state = annualState();
   const annualHours = calculateAnnualHours(state.credits);
-  const totalDays = state.days.reduce((sum, value) => sum + value, 0);
+  const totalDays = annualEventAvailableDays().days.reduce((sum, value) => sum + value, 0);
   const rawProjectedHours = calculateExpectedHours(totalDays, state.weeklyHours);
   const expected = selectExpectedHours(annualEventProjection(), rawProjectedHours);
   const rawDifference = calculateOperationalDifference(expected.hours, state.actualHours);
