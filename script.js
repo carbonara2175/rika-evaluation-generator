@@ -785,6 +785,8 @@ const eventSubmit = document.querySelector("#event-submit");
 const eventCancel = document.querySelector("#event-cancel");
 const eventsTableBody = document.querySelector("#events-table-body");
 const eventsEmpty = document.querySelector("#events-empty");
+const addNationalHolidaysButton = document.querySelector("#add-national-holidays");
+const holidayAddMessage = document.querySelector("#holiday-add-message");
 const scheduleSubject = document.querySelector("#schedule-subject");
 const scheduleForm = document.querySelector("#schedule-form");
 const scheduleDay = document.querySelector("#schedule-day");
@@ -922,6 +924,7 @@ function renderAnnualEvents() {
 
 function changeEventsContext() {
   resetEventForm();
+  holidayAddMessage.textContent = "";
   saveAnnualEvents(loadAnnualEvents());
   populateScheduleSubjects(scheduleSubject.value);
   renderAnnualEvents();
@@ -963,6 +966,23 @@ function initializeAnnualEvents() {
 
 eventsSchool.addEventListener("change", changeEventsContext);
 eventsYear.addEventListener("change", changeEventsContext);
+addNationalHolidaysButton.addEventListener("click", () => {
+  const year = selectedEventsYear();
+  eventsYear.value = year;
+  if (!hasNationalHolidayDataForSchoolYear(year)) {
+    holidayAddMessage.textContent = `${year}年度の祝日データはまだ収録されていません。`;
+    showToast("選択年度の祝日データはまだ収録されていません", true);
+    return;
+  }
+  if (!window.confirm(`${year}年度（${year}年4月1日～${year + 1}年3月31日）の国民の祝日・休日を一括追加します。`)) return;
+  const result = addMissingNationalHolidays(loadAnnualEvents(), year);
+  saveAnnualEvents(result.events);
+  renderAnnualEvents();
+  holidayAddMessage.textContent = result.skippedCount
+    ? `${result.addedCount}件追加、${result.skippedCount}件は登録済みのためスキップしました`
+    : `${result.addedCount}件追加しました`;
+  showToast(holidayAddMessage.textContent);
+});
 eventCancel.addEventListener("click", resetEventForm);
 scheduleSubject.addEventListener("change", () => {
   scheduleMessage.textContent = "";

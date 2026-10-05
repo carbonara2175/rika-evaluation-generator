@@ -5,13 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="学習指導要領の項目から、物理基礎・物理の3観点の評価規準を作成します。">
     <title>理科 評価規準ジェネレーター</title>
-    <link rel="stylesheet" href="style.css?v=1.6.1">
+    <link rel="stylesheet" href="style.css?v=1.6.2">
     <script src="https://cdn.jsdelivr.net/npm/pizzip@3.2.0/dist/pizzip.min.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/docxtemplater@3.62.0/build/docxtemplater.js" defer></script>
     <script src="annual-hours.js?v=1.5.1" defer></script>
     <script src="annual-events.js?v=1.0.1" defer></script>
+    <script src="national-holidays.js?v=1.0.0" defer></script>
     <script src="regular-schedule.js?v=1.1.1" defer></script>
-    <script src="script.js?v=1.6.2" defer></script>
+    <script src="script.js?v=1.6.3" defer></script>
   </head>
   <body>
     <header class="site-header">
@@ -178,6 +179,10 @@
           <div class="events-context-grid">
             <label class="field"><span>学校</span><select id="events-school"></select></label>
             <label class="field"><span>年度</span><span class="year-input"><input id="events-year" type="number" min="2000" max="2100" step="1" inputmode="numeric"><small>年度</small></span></label>
+            <div class="holiday-bulk-action">
+              <button class="copy-all-button" id="add-national-holidays" type="button">国民の祝日・休日を一括追加</button>
+              <p id="holiday-add-message" role="status" aria-live="polite"></p>
+            </div>
           </div>
         </section>
 
