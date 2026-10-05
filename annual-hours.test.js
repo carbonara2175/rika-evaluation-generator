@@ -5,7 +5,8 @@ const assert = require("node:assert/strict");
 const {
   calculateAnnualHours, calculateExpectedHours, calculateUnitHoursTotal,
   calculateOperationalDifference, annualEventReferenceYearStorageKey, selectExpectedHours,
-  buildUnitLessonTimeline, endpointId, findAutomaticExamRange, calculateExamRangeDifference
+  buildUnitLessonTimeline, endpointId, findAutomaticExamRange, calculateExamRangeDifference,
+  reconcileTeachingOrder
 } = require("./annual-hours");
 
 test("standard annual hours remain credits times 35", () => {
@@ -89,4 +90,32 @@ test("exam candidate reaches the first hour after a nine-hour opening unit", () 
   assert.equal(endpointId(candidate), "forces:1");
   assert.equal(calculateExamRangeDifference(10, motion[8]), 1);
   assert.equal(calculateExamRangeDifference(10, { ...force1, cumulativeHours: 12 }), -2);
+});
+
+test("teaching order keeps valid saved IDs and appends newly defined units", () => {
+  const units = [{ id: "motion" }, { id: "waves" }, { id: "heat" }, { id: "electricity" }];
+  assert.deepEqual(reconcileTeachingOrder(units, ["motion", "heat", "removed", "heat", "waves"]), [
+    "motion", "heat", "waves", "electricity"
+  ]);
+  assert.deepEqual(reconcileTeachingOrder(units, null), ["motion", "waves", "heat", "electricity"]);
+});
+
+test("a confirmed heat endpoint is recalculated without later waves", () => {
+  const units = [
+    { id: "motion", unit: "運動の表し方" },
+    { id: "forces", unit: "様々な力とその働き" },
+    { id: "mechanical-energy", unit: "力学的エネルギー" },
+    { id: "heat", unit: "熱" },
+    { id: "waves", unit: "波" }
+  ];
+  const hours = { motion: 9, forces: 16, "mechanical-energy": 10, heat: 6, waves: 11 };
+  const plans = units.map((unit) => ({
+    unitId: unit.id, allocatedHours: hours[unit.id],
+    rows: Array.from({ length: hours[unit.id] }, (_, index) => ({ hour: index + 1 }))
+  }));
+  const { lessons } = buildUnitLessonTimeline(units, plans);
+  const heat6 = lessons.find((lesson) => endpointId(lesson) === "heat:6");
+  assert.equal(heat6.cumulativeHours, 41);
+  assert.equal(calculateExamRangeDifference(45, heat6), 4);
+  assert.equal(findAutomaticExamRange(lessons, 45).unitId, "waves");
 });

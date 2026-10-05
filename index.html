@@ -5,14 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="学習指導要領の項目から、物理基礎・物理の3観点の評価規準を作成します。">
     <title>理科 評価規準ジェネレーター</title>
-    <link rel="stylesheet" href="style.css?v=1.7.0">
+    <link rel="stylesheet" href="style.css?v=1.8.0">
     <script src="https://cdn.jsdelivr.net/npm/pizzip@3.2.0/dist/pizzip.min.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/docxtemplater@3.62.0/build/docxtemplater.js" defer></script>
-    <script src="annual-hours.js?v=1.7.0" defer></script>
+    <script src="annual-hours.js?v=1.8.0" defer></script>
     <script src="annual-events.js?v=1.0.1" defer></script>
     <script src="national-holidays.js?v=1.0.0" defer></script>
     <script src="regular-schedule.js?v=1.2.0" defer></script>
-    <script src="script.js?v=1.9.0" defer></script>
+    <script src="script.js?v=1.10.0" defer></script>
   </head>
   <body>
     <header class="site-header">
@@ -155,25 +155,32 @@
           <div class="unit-hours-total" aria-live="polite"><span>実授業時数 合計</span><strong id="unit-total-hours">0時間</strong><small>この学校・科目で保存済みの単元配当時数を集計</small></div>
         </section>
 
+        <section class="unit-plan-block teaching-order-section" aria-labelledby="teaching-order-heading">
+          <div class="section-heading"><span class="step-number" aria-hidden="true">02</span><div><h2 id="teaching-order-heading">単元の授業実施順</h2><p>考査範囲や進度計算に使用する単元の授業順です。学習指導要領上の単元構成とは別に設定できます。</p></div></div>
+          <ol id="teaching-order-list" class="teaching-order-list" aria-live="polite"></ol>
+          <p id="teaching-order-empty" class="teaching-order-empty" hidden>この科目には並べ替え可能な既定単元がありません。</p>
+          <div class="teaching-order-actions"><button id="reset-teaching-order" class="reset-button" type="button">初期順に戻す</button></div>
+        </section>
+
         <section class="unit-generated-block" aria-labelledby="unit-goals-heading">
-          <div class="section-heading"><span class="step-number" aria-hidden="true">02</span><div><h2 id="unit-goals-heading">単元の目標</h2><p>選択した中項目・小項目から自動生成します。</p></div></div>
+          <div class="section-heading"><span class="step-number" aria-hidden="true">03</span><div><h2 id="unit-goals-heading">単元の目標</h2><p>選択した中項目・小項目から自動生成します。</p></div></div>
           <div class="generated-list" id="unit-goals"></div>
         </section>
 
         <section class="unit-generated-block" aria-labelledby="unit-criteria-heading">
-          <div class="section-heading"><span class="step-number" aria-hidden="true">03</span><div><h2 id="unit-criteria-heading">単元の評価規準</h2><p>評価規準機能と同じ生成ルールを利用しています。</p></div></div>
+          <div class="section-heading"><span class="step-number" aria-hidden="true">04</span><div><h2 id="unit-criteria-heading">単元の評価規準</h2><p>評価規準機能と同じ生成ルールを利用しています。</p></div></div>
           <div class="criteria-grid compact" id="unit-criteria"></div>
         </section>
 
         <section class="unit-plan-block" aria-labelledby="lesson-plan-heading">
-          <div class="plan-heading-row"><div class="section-heading"><span class="step-number" aria-hidden="true">04</span><div><h2 id="lesson-plan-heading">指導と評価の計画</h2><p>評価セルをクリックすると、空欄 → ○ → ◎ の順に切り替わります。</p></div></div><strong id="hours-progress">8 / 8時間</strong></div>
+          <div class="plan-heading-row"><div class="section-heading"><span class="step-number" aria-hidden="true">05</span><div><h2 id="lesson-plan-heading">指導と評価の計画</h2><p>評価セルをクリックすると、空欄 → ○ → ◎ の順に切り替わります。</p></div></div><strong id="hours-progress">8 / 8時間</strong></div>
           <div class="evaluation-legend" aria-label="評価記号の凡例"><span><b>○</b> 形成的評価</span><span><b>◎</b> 総括的評価（記録に残す評価）</span></div>
           <div class="unit-table-wrap"><table class="unit-plan-table"><thead><tr><th>時間</th><th>学習活動（学習内容）</th><th>知</th><th>思</th><th>態</th><th>評価の観点及び方法</th></tr></thead><tbody id="lesson-rows"></tbody></table></div>
           <div class="unit-plan-actions"><button class="copy-all-button" id="export-unit-plan-word" type="button">Word形式で出力</button><button class="copy-all-button secondary" id="copy-unit-plan" type="button">単元指導計画をまとめてコピー</button><button class="reset-button" id="reset-unit-plan" type="button">この単元の入力をリセット</button></div>
         </section>
 
         <section class="unit-plan-block exam-range-section" aria-labelledby="exam-range-heading">
-          <div class="section-heading"><span class="step-number" aria-hidden="true">05</span><div><h2 id="exam-range-heading">考査範囲と進度見込み</h2><p>考査までの授業実施見込みから候補を示します。実際の範囲終点は教員が選択して保存してください。</p></div></div>
+          <div class="section-heading"><span class="step-number" aria-hidden="true">06</span><div><h2 id="exam-range-heading">考査範囲と進度見込み</h2><p>考査までの授業実施見込みから候補を示します。実際の範囲終点は教員が選択して保存してください。</p></div></div>
           <p id="exam-range-context" class="exam-range-context"></p>
           <p id="exam-range-message" class="exam-checkpoints-message" role="status"></p>
           <div id="exam-range-list" class="exam-range-list"></div>
