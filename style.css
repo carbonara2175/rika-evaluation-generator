@@ -241,6 +241,28 @@ textarea:focus-visible { outline: 3px solid rgba(38, 113, 166, .28); outline-off
 .evaluation-toggle.summative, .evaluation-toggle[data-value="summative"] { color: #fff; background: var(--navy); }
 .unit-plan-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
 .mobile-label { display: none; }
+.exam-range-section { padding-top: 32px; border-top: 1px solid var(--line); }
+.exam-range-context { margin: 16px 0; color: var(--muted); font-size: .88rem; font-weight: 700; }
+.exam-range-message { white-space: pre-line; }
+.exam-range-list { display: grid; gap: 18px; margin-top: 20px; }
+.exam-range-card { padding: 22px; background: #fff; border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
+.exam-range-card-header { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; padding-bottom: 13px; border-bottom: 2px solid var(--blue-soft); }
+.exam-range-card-header h3 { margin: 0; color: var(--navy); }
+.exam-range-card-header span { color: var(--muted); font-size: .82rem; }
+.exam-range-metrics { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin: 16px 0; }
+.exam-range-metrics div { min-width: 0; padding: 11px 12px; background: #f8fafb; border-radius: 6px; }
+.exam-range-metrics dt { color: var(--muted); font-size: .72rem; font-weight: 700; }
+.exam-range-metrics dd { margin: 4px 0 0; color: var(--navy); font-size: .91rem; font-weight: 700; }
+.exam-range-metrics .automatic-range { background: var(--blue-soft); }
+.exam-range-metrics .automatic-range dd { color: var(--blue); }
+.exam-range-metrics .range-margin { background: #edf8f3; }
+.exam-range-metrics .range-margin dd { color: var(--success); }
+.exam-range-metrics .range-shortage { background: #fff4e5; }
+.exam-range-metrics .range-shortage dd { color: #9c5b12; }
+.exam-range-controls { display: grid; grid-template-columns: minmax(260px, 1fr) auto; align-items: end; gap: 12px; }
+.exam-range-controls label { display: grid; gap: 6px; color: var(--navy); font-size: .82rem; font-weight: 700; }
+.exam-range-controls button { min-height: 48px; }
+.exam-range-warning { min-height: 1.4em; margin: 9px 0 0; color: #9b2c2c; font-size: .82rem; font-weight: 700; }
 
 @media (max-width: 760px) {
   .header-inner, .page-shell, .nav-inner { width: min(100% - 28px, 1120px); }
@@ -268,6 +290,9 @@ textarea:focus-visible { outline: 3px solid rgba(38, 113, 166, .28); outline-off
   .evaluation-legend { align-items: flex-start; flex-direction: column; gap: 3px; }
   .unit-plan-actions { align-items: stretch; flex-direction: column; }
   .unit-plan-actions button { width: 100%; }
+  .exam-range-metrics { grid-template-columns: 1fr 1fr; }
+  .exam-range-controls { grid-template-columns: 1fr; }
+  .exam-range-controls button { width: 100%; }
   .events-context-grid { grid-template-columns: 1fr 1fr; }
   .schedule-list { grid-template-columns: 1fr; }
   .event-form-grid { grid-template-columns: 1fr 1fr; }
@@ -280,6 +305,8 @@ textarea:focus-visible { outline: 3px solid rgba(38, 113, 166, .28); outline-off
   .annual-form-grid, .month-input-grid, .summary-grid, .events-context-grid, .event-form-grid, .schedule-subject-row, .schedule-add-row { grid-template-columns: 1fr; }
   .event-title-field, .event-memo-field, .event-form-actions { grid-column: auto; }
   .checkbox-field { margin-top: 0; }
+  .exam-range-card-header { align-items: flex-start; flex-direction: column; gap: 3px; }
+  .exam-range-metrics { grid-template-columns: 1fr; }
   .event-form-actions { align-items: stretch; flex-direction: column; }
   .event-form-actions button { width: 100%; }
 }

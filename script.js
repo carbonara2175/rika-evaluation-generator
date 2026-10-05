@@ -516,7 +516,7 @@ function initializeAnnual() {
 
 criteriaTab.addEventListener("click", () => selectView("criteria"));
 annualTab.addEventListener("click", () => selectView("annual"));
-unitPlanTab.addEventListener("click", () => selectView("unit-plan"));
+unitPlanTab.addEventListener("click", () => { selectView("unit-plan"); renderExamRanges(); });
 annualEventsTab.addEventListener("click", () => selectView("annual-events"));
 annualSchool.addEventListener("change", () => { populateAnnualCourses(); applyAnnualState(); renderAnnual(); });
 annualSubject.addEventListener("change", () => { applyAnnualState(); renderAnnual(); });
@@ -572,6 +572,7 @@ const PLAN_STORAGE_PREFIX = "rika-unit-plan-v2:";
 const LEGACY_PLAN_STORAGE_PREFIX = "rika-unit-plan-v1:";
 const PLAN_LAST_UNIT_PREFIX = "rika-unit-plan-last-unit-v2:";
 const PLAN_USER_INFO_KEY = "rika-unit-plan-user-info-v1";
+const EXAM_RANGE_STORAGE_PREFIX = "rika-exam-range-v1:";
 const planSchool = document.querySelector("#plan-school");
 const planSubject = document.querySelector("#plan-subject");
 const planUnit = document.querySelector("#plan-unit");
@@ -618,6 +619,143 @@ function unitHoursTotal(schoolId, courseId) {
   return calculateUnitHoursTotal(plans);
 }
 
+function savedPlansInCurriculumOrder() {
+  const units = planUnits();
+  const orderedUnits = units.length ? units : [planUnitData()];
+  const plans = orderedUnits.map((unit) => {
+    try {
+      return JSON.parse(localStorage.getItem(`${PLAN_STORAGE_PREFIX}${planSchool.value}__${planSubject.value}__${unit.id}`));
+    } catch { return null; }
+  }).filter(Boolean);
+  return { orderedUnits, plans };
+}
+
+function planReferenceYear() {
+  const saved = Number(localStorage.getItem(annualEventReferenceYearStorageKey(planSchool.value, planSubject.value)));
+  return Number.isInteger(saved) && saved >= 2000 && saved <= 2100 ? saved : new Date().getFullYear();
+}
+
+function examRangeStorageKey(year, checkpoint) {
+  const examId = checkpoint.id || `${checkpoint.startDate}_${checkpoint.endDate}_${stableCustomId(checkpoint.title, "exam")}`;
+  return `${EXAM_RANGE_STORAGE_PREFIX}${planSchool.value}:${planSubject.value}:${year}:${examId}`;
+}
+
+function planExamProjection(year) {
+  let slots = [];
+  let events = [];
+  try {
+    slots = normalizeRegularSchedule(JSON.parse(localStorage.getItem(regularScheduleStorageKey(planSchool.value, year, planSubject.value))));
+    const saved = JSON.parse(localStorage.getItem(annualEventsStorageKey(planSchool.value, year)));
+    events = Array.isArray(saved) ? sortAnnualEvents(saved) : [];
+  } catch { /* Missing settings are reported by the range UI. */ }
+  return { hasRegularSchedule: slots.length > 0, checkpoints: calculateExamCheckpoints(year, slots, events) };
+}
+
+function loadConfirmedExamRange(year, checkpoint) {
+  try { return JSON.parse(localStorage.getItem(examRangeStorageKey(year, checkpoint))); }
+  catch { return null; }
+}
+
+function lessonLabel(lesson) {
+  return lesson ? `${lesson.unitName} 第${lesson.hour}時まで` : "候補なし";
+}
+
+function renderExamRanges() {
+  const context = document.querySelector("#exam-range-context");
+  const message = document.querySelector("#exam-range-message");
+  const list = document.querySelector("#exam-range-list");
+  if (!context || !message || !list) return;
+  const year = planReferenceYear();
+  context.textContent = `${SCHOOLS[planSchool.value]?.name || "選択中の学校"}・${planSubjectData().name}・${year}年度（年間行事参照年度）`;
+  const projection = planExamProjection(year);
+  const { orderedUnits, plans } = savedPlansInCurriculumOrder();
+  const { lessons, warnings } = buildUnitLessonTimeline(orderedUnits, plans);
+  const notices = [...warnings];
+  if (!projection.hasRegularSchedule) notices.unshift("通常時間割が登録されていないため算出できません");
+  else if (!projection.checkpoints.length) notices.unshift("考査が登録されていません");
+  else if (!lessons.length) notices.unshift("保存済みの単元指導計画の時間データがありません");
+  message.textContent = notices.join("\n");
+  message.hidden = notices.length === 0;
+  list.replaceChildren();
+  if (!projection.hasRegularSchedule || !projection.checkpoints.length || !lessons.length) return;
+
+  const effectiveEndpoints = [];
+  projection.checkpoints.forEach((checkpoint, examIndex) => {
+    const automatic = findAutomaticExamRange(lessons, checkpoint.cumulativeHours);
+    const saved = loadConfirmedExamRange(year, checkpoint);
+    const confirmed = saved ? lessons.find((lesson) => endpointId(lesson) === saved.endpointId) : null;
+    const invalidSaved = Boolean(saved && !confirmed);
+    const selected = confirmed || automatic || lessons[0];
+    effectiveEndpoints.push(selected);
+    const article = document.createElement("article");
+    article.className = "exam-range-card";
+    const header = document.createElement("div");
+    header.className = "exam-range-card-header";
+    const heading = document.createElement("h3");
+    heading.textContent = checkpoint.title;
+    const period = document.createElement("span");
+    period.textContent = formatEventDateRange(checkpoint.startDate, checkpoint.endDate);
+    header.append(heading, period);
+
+    const metrics = document.createElement("dl");
+    metrics.className = "exam-range-metrics";
+    const addMetric = (label, value, className = "") => {
+      const item = document.createElement("div");
+      if (className) item.className = className;
+      const term = document.createElement("dt"); term.textContent = label;
+      const detail = document.createElement("dd"); detail.textContent = value;
+      item.append(term, detail); metrics.append(item);
+      return detail;
+    };
+    addMetric("この期間の授業時数", `${checkpoint.periodHours}時間`);
+    addMetric("考査までの授業実施見込み", `${checkpoint.cumulativeHours}時間`);
+    addMetric("自動候補", lessonLabel(automatic), "automatic-range");
+    const required = addMetric(saved && confirmed ? "確定範囲の必要時数" : "選択範囲の必要時数", `${selected.cumulativeHours}時間`);
+    const difference = calculateExamRangeDifference(checkpoint.cumulativeHours, selected);
+    const balance = addMetric(difference >= 0 ? "余裕" : "不足", `${Math.abs(difference)}時間`, difference < 0 ? "range-shortage" : "range-margin");
+
+    const controls = document.createElement("div");
+    controls.className = "exam-range-controls";
+    const label = document.createElement("label");
+    const labelText = document.createElement("span");
+    labelText.textContent = saved && confirmed ? "確定範囲" : "考査範囲終点（未確定・自動候補を初期選択）";
+    const select = document.createElement("select");
+    select.setAttribute("aria-label", `${checkpoint.title}の考査範囲終点`);
+    select.replaceChildren(...lessons.map((lesson) => new Option(lessonLabel(lesson), endpointId(lesson))));
+    select.value = endpointId(selected);
+    label.append(labelText, select);
+    const save = document.createElement("button");
+    save.type = "button"; save.className = "copy-all-button"; save.textContent = "この範囲を確定・保存";
+    const warning = document.createElement("p");
+    warning.className = "exam-range-warning";
+    if (invalidSaved) warning.textContent = "保存済みの考査範囲が現在の単元指導計画に存在しません";
+    const updatePreview = () => {
+      const endpoint = lessons.find((lesson) => endpointId(lesson) === select.value);
+      if (!endpoint) return;
+      required.textContent = `${endpoint.cumulativeHours}時間`;
+      const gap = calculateExamRangeDifference(checkpoint.cumulativeHours, endpoint);
+      balance.textContent = `${Math.abs(gap)}時間`;
+      balance.parentElement.querySelector("dt").textContent = gap >= 0 ? "余裕" : "不足";
+      balance.parentElement.className = gap < 0 ? "range-shortage" : "range-margin";
+      const previous = examIndex > 0 ? effectiveEndpoints[examIndex - 1] : null;
+      warning.textContent = previous && endpoint.cumulativeHours < previous.cumulativeHours
+        ? "前の考査より範囲終点が前になっています（保存は可能です）" : (invalidSaved ? "保存済みの考査範囲が現在の単元指導計画に存在しません" : "");
+    };
+    select.addEventListener("change", updatePreview);
+    save.addEventListener("click", () => {
+      const endpoint = lessons.find((lesson) => endpointId(lesson) === select.value);
+      if (!endpoint) return;
+      localStorage.setItem(examRangeStorageKey(year, checkpoint), JSON.stringify({ endpointId: endpointId(endpoint), unitId: endpoint.unitId, hour: endpoint.hour, savedAt: new Date().toISOString() }));
+      renderExamRanges();
+      showToast("考査範囲を保存しました");
+    });
+    controls.append(label, save);
+    article.append(header, metrics, controls, warning);
+    list.append(article);
+    updatePreview();
+  });
+}
+
 function renderUnitHoursTotal() {
   document.querySelector("#unit-total-hours").textContent = `${unitHoursTotal(planSchool.value, planSubject.value)}時間`;
 }
@@ -658,6 +796,7 @@ function savePlan() {
     localStorage.setItem(`${PLAN_LAST_UNIT_PREFIX}${planSchool.value}__${planSubject.value}`, JSON.stringify({ unitId: planUnitData().id, unitName: planUnitData().unit }));
   } catch { /* Storage may be disabled by the browser. */ }
   renderUnitHoursTotal();
+  renderExamRanges();
 }
 
 function userInfo() {
@@ -722,6 +861,7 @@ function renderUnitPlan() {
   }));
   renderLessonRows(plan);
   renderUnitHoursTotal();
+  renderExamRanges();
 }
 
 function populatePlanUnits(preferredUnit) {
