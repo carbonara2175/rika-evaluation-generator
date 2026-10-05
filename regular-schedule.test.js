@@ -44,6 +44,26 @@ test("a fiscal year generates every matching timetable session", () => {
   assert.equal(result.scheduledSessions.at(-1).date, "2027-03-31");
 });
 
+test("Sanno 2026 example links 104 planned minus 45 excluded as 59 available hours", () => {
+  const slots = [
+    { dayOfWeek: "monday", period: 3 },
+    { dayOfWeek: "tuesday", period: 3 }
+  ];
+  const baseline = calculateScheduleProjection(2026, slots, []);
+  const events = baseline.scheduledSessions.slice(0, 45).map((session, index) => ({
+    id: `excluded-${index}`,
+    startDate: session.date,
+    endDate: session.date,
+    title: "年間行事",
+    regularClassesAvailable: false
+  }));
+  const result = calculateScheduleProjection(2026, slots, events);
+
+  assert.equal(result.plannedCount, 104);
+  assert.equal(result.excludedCount, 45);
+  assert.equal(result.availableCount, 59);
+});
+
 test("unavailable multi-day events exclude matching sessions only", () => {
   const result = calculateScheduleProjection(2026, [
     { dayOfWeek: "monday", period: 3 },
