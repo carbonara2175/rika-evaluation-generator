@@ -69,6 +69,13 @@ test("available events do not exclude and overlapping unavailable reasons do not
   assert.deepEqual(result.excludedSessions[0].eventTitles, ["体育祭", "校内行事"]);
 });
 
+test("an unnamed event uses its category as the exclusion reason", () => {
+  const result = calculateScheduleProjection(2026, [{ dayOfWeek: "wednesday", period: 3 }], [
+    { startDate: "2026-07-22", title: "", category: "holiday", regularClassesAvailable: false }
+  ]);
+  assert.deepEqual(result.excludedSessions[0].eventTitles, ["休業日"]);
+});
+
 test("date-only validation is independent of the runtime local timezone", () => {
   assert.equal(dateOnlyToUtc("2026-05-18").getUTCDay(), 1);
   assert.equal(dateOnlyToUtc("2026-02-30"), null);
