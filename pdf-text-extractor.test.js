@@ -34,7 +34,10 @@ test("all pages are extracted and returned in a parser-friendly structure", asyn
         async getPage(number) {
           return {
             getViewport() { return { width: 800, height: 600 }; },
-            async getTextContent() { return { items: pageItems[number - 1] }; }
+            async getTextContent(options) {
+              assert.deepEqual(options, { includeMarkedContent: false, disableNormalization: false });
+              return { items: pageItems[number - 1] };
+            }
           };
         },
         async destroy() { destroyed = true; }
@@ -120,10 +123,39 @@ test("calendar restoration recognizes full-width labels and removes positioned t
   ]);
 });
 
-test("calendar restoration fails safely when headers or rows are incomplete", () => {
-  assert.deepEqual(restoreAnnualCalendar({ width: 800, height: 600, items: [] }, 2026), {
-    ok: false, error: "月列を正しく認識できませんでした", monthHeaders: [], dayRows: [], cells: []
+test("combined PDF text items restore Mito High School-style month headers, rows, and holidays", () => {
+  const monthText = "4月 5月 6月 7月 8月 9月 10月 11月 12月 1月 2月 3月";
+  const items = [positioned(monthText, 50, 560, 840)];
+  const holidays = new Map([
+    ["29:4", "昭和の日"], ["3:5", "憲法記念日"], ["4:5", "みどりの日"], ["5:5", "こどもの日"],
+    ["20:7", "海の日"], ["11:8", "山の日"], ["21:9", "敬老の日"], ["23:9", "秋分の日"]
+  ]);
+  const months = [4, 5, 6, 7, 8, 9, 10, 11, 12, 1, 2, 3];
+  for (let day = 1; day <= 31; day += 1) {
+    const row = `${String(day).padEnd(5)}${months.map((month) =>
+      `水 □ ${holidays.get(`${day}:${month}`) || "・"}`.padEnd(12)).join("")}`;
+    items.push(positioned(row, 5, 530 - (day - 1) * 15, 900));
+  }
+
+  const result = restoreAnnualCalendar({ width: 910, height: 600, items }, 2026);
+  assert.equal(result.ok, true);
+  assert.equal(result.monthHeaders.length, 12);
+  assert.equal(result.dayRows.length, 31);
+  holidays.forEach((name, key) => {
+    const [day, month] = key.split(":").map(Number);
+    const year = month >= 4 ? 2026 : 2027;
+    const date = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    assert.match(result.cells.find((cell) => cell.date === date)?.text || "", new RegExp(name));
   });
+  assert.deepEqual(result.debug.monthHeaderCandidates, [monthText]);
+  assert.equal(result.debug.dayRowCandidates.length, 31);
+});
+
+test("calendar restoration fails safely when headers or rows are incomplete", () => {
+  const empty = restoreAnnualCalendar({ width: 800, height: 600, items: [] }, 2026);
+  assert.equal(empty.ok, false);
+  assert.equal(empty.error, "月列を正しく認識できませんでした");
+  assert.deepEqual(empty.debug, { itemCount: 0, monthHeaderCandidates: [], dayRowCandidates: [] });
   const headers = [4, 5, 6, 7, 8, 9, 10, 11, 12, 1, 2, 3].map((month, index) => positioned(`${month}月`, 50 + index * 60, 550));
   const result = restoreAnnualCalendar({ width: 800, height: 600, items: headers }, 2026);
   assert.equal(result.ok, false);

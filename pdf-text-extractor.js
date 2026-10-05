@@ -65,36 +65,80 @@ const median = (numbers) => {
   return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
 };
 
+function monthOccurrences(item) {
+  const text = String(item.text ?? "").normalize("NFKC");
+  const matches = [...text.matchAll(/(?:1[0-2]|[1-9])\s*月/g)];
+  return matches.map((match) => {
+    // PDF.js may return a whole header row as one item. In that case its width
+    // still describes the complete string, so interpolate each label's centre
+    // within that width rather than relying on document-specific coordinates.
+    const relativeCenter = (match.index + match[0].length / 2) / Math.max(text.length, 1);
+    return { ...item, text: match[0], month: Number(match[0].match(/\d+/)[0]),
+      x: item.x + item.width * relativeCenter, width: 0, source: item };
+  });
+}
+
 function findMonthHeaders(items, pageHeight) {
   // NFKC normalization is deliberately limited to recognizing table labels. The
   // original item text is retained for the cell output.
-  const candidates = items.filter((item) => /^(?:[1-9]|1[0-2])月$/.test(normalizeCalendarToken(item.text)));
+  const candidates = items.flatMap(monthOccurrences);
   let best = [];
   candidates.forEach((anchor) => {
     const tolerance = Math.max(4, anchor.height * 1.5, pageHeight * 0.012);
-    const band = candidates.filter((item) => Math.abs(item.y - anchor.y) <= tolerance);
-    const headers = FISCAL_MONTHS.map((month) => {
-      const matches = band.filter((item) => normalizeCalendarToken(item.text) === `${month}月`);
-      return matches.sort((a, b) => Math.abs(a.y - anchor.y) - Math.abs(b.y - anchor.y))[0];
-    });
-    if (headers.every(Boolean) && headers.every((item, index) => !index || centerX(item) > centerX(headers[index - 1]))) {
-      if (!best.length || median(headers.map((item) => item.y)) > median(best.map((item) => item.y))) best = headers;
+    const band = candidates.filter((item) => Math.abs(item.y - anchor.y) <= tolerance)
+      .sort((a, b) => centerX(a) - centerX(b));
+    for (let start = 0; start <= band.length - FISCAL_MONTHS.length; start += 1) {
+      const headers = band.slice(start, start + FISCAL_MONTHS.length);
+      if (headers.every((item, index) => item.month === FISCAL_MONTHS[index])) {
+        if (!best.length || median(headers.map((item) => item.y)) > median(best.map((item) => item.y))) best = headers;
+      }
     }
   });
   return best;
 }
 
-function findDayRows(items, pageWidth) {
-  const candidates = items.filter((item) => {
-    if (!/^(?:[1-9]|[12]\d|3[01])$/.test(normalizeCalendarToken(item.text))) return false;
-    const x = centerX(item);
-    return x <= pageWidth * 0.15 || x >= pageWidth * 0.85;
+function clusterTextLines(items) {
+  const lines = [];
+  [...items].sort((a, b) => b.y - a.y || a.x - b.x).forEach((item) => {
+    const tolerance = Math.max(2, item.height * 0.55);
+    let line = lines.find((candidate) => Math.abs(candidate.y - item.y) <= tolerance);
+    if (!line) {
+      line = { y: item.y, items: [] };
+      lines.push(line);
+    }
+    line.items.push(item);
   });
+  return lines.map((line) => ({ ...line, items: line.items.sort((a, b) => a.x - b.x) }));
+}
+
+function leadingDay(text) {
+  const match = String(text ?? "").normalize("NFKC").trim().match(/^([1-9]|[12]\d|3[01])(?!\d)(?!\s*月)/);
+  return match ? Number(match[1]) : null;
+}
+
+function findDayRows(items) {
+  const candidates = clusterTextLines(items).map((line) => {
+    const first = line.items[0];
+    const leadingText = line.items.map((item) => item.text).join(" ");
+    const day = leadingDay(leadingText);
+    return day ? { day, y: median(line.items.map((item) => item.y)), sources: [first],
+      leadingText } : null;
+  }).filter(Boolean);
   return Array.from({ length: 31 }, (_, index) => {
     const day = index + 1;
-    const matches = candidates.filter((item) => Number(normalizeCalendarToken(item.text)) === day);
-    return matches.length ? { day, y: median(matches.map((item) => item.y)), sources: matches } : null;
+    const matches = candidates.filter((item) => item.day === day);
+    return matches.length ? { day, y: median(matches.map((item) => item.y)),
+      sources: matches.flatMap((item) => item.sources), leadingText: matches[0].leadingText } : null;
   }).filter(Boolean);
+}
+
+function splitPositionedItem(item) {
+  const text = String(item.text ?? "");
+  const tokens = [...text.matchAll(/\S+/g)];
+  if (tokens.length < 2) return [item];
+  return tokens.map((match) => ({ ...item, text: match[0],
+    x: item.x + item.width * (match.index / text.length),
+    width: item.width * (match[0].length / text.length), source: item }));
 }
 
 function makeBoundaries(positions) {
@@ -127,25 +171,35 @@ function joinCellItems(items) {
 
 /** Restore a 12-month by 31-day calendar from positioned PDF text. */
 function restoreAnnualCalendar(page, fiscalYear) {
-  const items = Array.isArray(page?.items) ? page.items : [];
-  const monthHeaders = findMonthHeaders(items, page.height || 0);
-  if (monthHeaders.length !== 12) return { ok: false, error: "月列を正しく認識できませんでした", monthHeaders, dayRows: [], cells: [] };
-  const dayRows = findDayRows(items, page.width || 0);
+  const rawItems = Array.isArray(page?.items) ? page.items : [];
+  // Whitespace-delimited pieces retain an estimated position inside a combined
+  // PDF.js item. Standalone items are left untouched.
+  const items = rawItems.flatMap(splitPositionedItem);
+  const debug = {
+    itemCount: rawItems.length,
+    monthHeaderCandidates: rawItems.filter((item) => monthOccurrences(item).length).map((item) => item.text),
+    dayRowCandidates: clusterTextLines(items).map((line) => line.items.map((item) => item.text).join(" "))
+      .filter((text) => leadingDay(text))
+  };
+  const monthHeaders = findMonthHeaders(rawItems, page.height || 0);
+  if (monthHeaders.length !== 12) return { ok: false, error: "月列を正しく認識できませんでした", monthHeaders, dayRows: [], cells: [], debug };
+  const dayRows = findDayRows(items);
   if (dayRows.length !== 31) return {
     ok: false,
     error: "日付行を正しく認識できませんでした",
     monthHeaders: monthHeaders.map((item, index) => ({ month: FISCAL_MONTHS[index], x: centerX(item), y: item.y })),
     dayRows: dayRows.map(({ day, y }) => ({ day, y })),
-    cells: []
+    cells: [], debug
   };
 
   const monthBounds = makeBoundaries(monthHeaders.map(centerX));
   const rowsTopDown = [...dayRows].sort((a, b) => b.y - a.y);
   const rowBounds = makeBoundaries(rowsTopDown.map((row) => -row.y)).map((value) => -value);
-  const excluded = new Set([...monthHeaders, ...dayRows.flatMap((row) => row.sources)]);
+  const excluded = new Set([...monthHeaders, ...monthHeaders.map((header) => header.source),
+    ...dayRows.flatMap((row) => row.sources)]);
   const buckets = new Map();
   items.forEach((item) => {
-    if (!item.text || excluded.has(item)) return;
+    if (!item.text || excluded.has(item) || excluded.has(item.source)) return;
     const x = centerX(item);
     const monthIndex = monthBounds.findIndex((right, index) => index < 12 && x >= monthBounds[index] && x < monthBounds[index + 1]);
     if (monthIndex < 0) return;
@@ -170,7 +224,7 @@ function restoreAnnualCalendar(page, fiscalYear) {
   cells.sort((a, b) => a.date.localeCompare(b.date));
   return {
     ok: true, monthHeaders: monthHeaders.map((item, index) => ({ month: FISCAL_MONTHS[index], x: centerX(item), y: item.y })),
-    monthBoundaries: monthBounds, dayRows: dayRows.map(({ day, y }) => ({ day, y })), cells
+    monthBoundaries: monthBounds, dayRows: dayRows.map(({ day, y }) => ({ day, y })), cells, debug
   };
 }
 
@@ -189,7 +243,10 @@ async function extractPdfText(file, options = {}) {
     for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
       options.onProgress?.(pageNumber, pdf.numPages);
       const page = await pdf.getPage(pageNumber);
-      const textContent = await page.getTextContent();
+      // PDF.js 3.11.174 has no disableCombineTextItems parameter. Its supported
+      // options are includeMarkedContent and disableNormalization; explicitly
+      // keep both disabled, then handle combined items geometrically below.
+      const textContent = await page.getTextContent({ includeMarkedContent: false, disableNormalization: false });
       const viewport = page.getViewport?.({ scale: 1 }) || {};
       const items = textContent.items.map((item) => normalizePdfItem(item, pageNumber)).filter((item) => item.text);
       pages.push({ pageNumber, width: Number(viewport.width) || 0, height: Number(viewport.height) || 0,
@@ -302,7 +359,11 @@ function initializePdfImport() {
       debugOutput.textContent = restored.map((page, index) => {
         const months = page.monthHeaders.map((header) => `${header.month}月 x=${header.x.toFixed(1)}`).join(", ");
         const days = page.dayRows.map((row) => `${row.day}日 y=${row.y.toFixed(1)}`).join(", ");
-        return `${index + 1}ページ\n月列: ${months || "認識なし"}\n日付行: ${days || "認識なし"}`;
+        return `${index + 1}ページ\n取得したtext item数: ${page.debug.itemCount}`
+          + `\n月ヘッダー候補として検出した文字列: ${page.debug.monthHeaderCandidates.join(" | ") || "なし"}`
+          + `\n日付行候補として検出した先頭文字列: ${page.debug.dayRowCandidates.join(" | ") || "なし"}`
+          + `\n認識月数: ${page.monthHeaders.length}\n認識日付行数: ${page.dayRows.length}`
+          + `\n月列: ${months || "認識なし"}\n日付行: ${days || "認識なし"}`;
       }).join("\n\n");
       resultPanel.hidden = false;
       if (result.combinedText.replace(/\s/g, "").length < 5) {
