@@ -5,13 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="学習指導要領の項目から、物理基礎・物理の3観点の評価規準を作成します。">
     <title>理科 評価規準ジェネレーター</title>
-    <link rel="stylesheet" href="style.css?v=1.9.0">
+    <link rel="stylesheet" href="style.css?v=1.10.0">
     <script src="https://cdn.jsdelivr.net/npm/pizzip@3.2.0/dist/pizzip.min.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/docxtemplater@3.62.0/build/docxtemplater.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js" defer></script>
     <script src="annual-hours.js?v=1.8.0" defer></script>
     <script src="annual-events.js?v=1.0.1" defer></script>
-    <script src="pdf-text-extractor.js?v=1.0.0" defer></script>
+    <script src="pdf-text-extractor.js?v=1.1.0" defer></script>
     <script src="national-holidays.js?v=1.0.0" defer></script>
     <script src="regular-schedule.js?v=1.2.0" defer></script>
     <script src="script.js?v=1.10.0" defer></script>
@@ -237,6 +237,11 @@
             <dl class="pdf-file-info"><div><dt>ファイル</dt><dd id="pdf-file-name"></dd></div><div><dt>ページ数</dt><dd id="pdf-page-count"></dd></div></dl>
             <label for="pdf-extracted-text">抽出結果</label>
             <textarea id="pdf-extracted-text" rows="16" readonly spellcheck="false"></textarea>
+            <section id="pdf-calendar-result" class="pdf-calendar-result" aria-labelledby="pdf-calendar-heading" hidden>
+              <div class="pdf-calendar-heading"><div><h3 id="pdf-calendar-heading">日付別抽出結果</h3><p id="pdf-calendar-message"></p></div><label>表示月 <select id="pdf-calendar-month"></select></label></div>
+              <div class="pdf-calendar-table-wrap"><table><thead><tr><th>日付</th><th>抽出内容</th></tr></thead><tbody id="pdf-calendar-body"></tbody></table></div>
+              <details><summary>解析情報を表示</summary><pre id="pdf-calendar-debug"></pre></details>
+            </section>
           </div>
         </section>
 
