@@ -310,6 +310,50 @@ function annualEventProjection() {
   };
 }
 
+function annualExamProjection() {
+  const { schoolId, courseId } = annualIds();
+  const year = selectedAnnualEventsReferenceYear();
+  let slots = [];
+  let events = [];
+  try {
+    slots = normalizeRegularSchedule(JSON.parse(localStorage.getItem(regularScheduleStorageKey(schoolId, year, courseId))));
+    const savedEvents = JSON.parse(localStorage.getItem(annualEventsStorageKey(schoolId, year)));
+    events = Array.isArray(savedEvents) ? sortAnnualEvents(savedEvents) : [];
+  } catch { /* Invalid or unavailable storage is treated as missing data. */ }
+  return { hasRegularSchedule: slots.length > 0, checkpoints: calculateExamCheckpoints(year, slots, events) };
+}
+
+function renderExamCheckpoints() {
+  const { hasRegularSchedule, checkpoints } = annualExamProjection();
+  const message = document.querySelector("#exam-checkpoints-message");
+  const table = document.querySelector("#exam-checkpoints-table-wrap");
+  const body = document.querySelector("#exam-checkpoints-body");
+  const notice = !hasRegularSchedule
+    ? "通常時間割が登録されていないため算出できません"
+    : checkpoints.length === 0 ? "考査が登録されていません" : "";
+  message.textContent = notice;
+  message.hidden = !notice;
+  table.hidden = Boolean(notice);
+  body.replaceChildren(...checkpoints.map((checkpoint) => {
+    const row = document.createElement("tr");
+    const heading = document.createElement("th");
+    heading.scope = "row";
+    const name = document.createElement("span");
+    name.className = "exam-name";
+    name.textContent = checkpoint.title;
+    const period = document.createElement("small");
+    period.className = "exam-period";
+    period.textContent = formatEventDateRange(checkpoint.startDate, checkpoint.endDate);
+    heading.append(name, period);
+    const periodHours = document.createElement("td");
+    periodHours.textContent = `${checkpoint.periodHours}時間`;
+    const cumulativeHours = document.createElement("td");
+    cumulativeHours.innerHTML = `<strong>${checkpoint.cumulativeHours}時間</strong>`;
+    row.append(heading, periodHours, cumulativeHours);
+    return row;
+  }));
+}
+
 function annualEventAvailableDays() {
   const { schoolId } = annualIds();
   const year = selectedAnnualEventsReferenceYear();
@@ -416,6 +460,7 @@ function renderAnnual() {
     return row;
   }));
   document.querySelector("#annual-table-foot").innerHTML = `<tr><th scope="row">合計</th><td>${totalDays}日</td><td>${rawProjectedHours.toFixed(1)}h</td><td>${allocated}h</td></tr>`;
+  renderExamCheckpoints();
   saveAnnualState(state);
   saveAnnualEventsReferenceYear();
 }

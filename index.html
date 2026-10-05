@@ -11,8 +11,8 @@
     <script src="annual-hours.js?v=1.6.0" defer></script>
     <script src="annual-events.js?v=1.0.1" defer></script>
     <script src="national-holidays.js?v=1.0.0" defer></script>
-    <script src="regular-schedule.js?v=1.1.1" defer></script>
-    <script src="script.js?v=1.7.0" defer></script>
+    <script src="regular-schedule.js?v=1.2.0" defer></script>
+    <script src="script.js?v=1.8.0" defer></script>
   </head>
   <body>
     <header class="site-header">
@@ -126,6 +126,11 @@
             <article class="standard-difference-card"><span>標準時数との差</span><strong id="summary-margin">70時間</strong><small>標準年間時数 − 単元指導計画時数（実施上の余裕ではありません）</small></article>
           </div>
           <div class="result-table-wrap"><table><thead><tr><th>月</th><th>授業可能日</th><th>授業実施見込み</th><th>年計上の配当</th></tr></thead><tbody id="annual-table-body"></tbody><tfoot id="annual-table-foot"></tfoot></table></div>
+          <section class="exam-checkpoints" aria-labelledby="exam-checkpoints-heading">
+            <div class="section-heading"><span class="step-number" aria-hidden="true">04</span><div><h2 id="exam-checkpoints-heading">考査までの授業実施見込み</h2><p>考査開始日の前日までに、通常時間割と年間行事から実施可能と見込まれる授業時数です。</p></div></div>
+            <p id="exam-checkpoints-message" class="exam-checkpoints-message" role="status"></p>
+            <div id="exam-checkpoints-table-wrap" class="result-table-wrap exam-table-wrap"><table><thead><tr><th>考査</th><th>この期間の授業時数</th><th>年度累計</th></tr></thead><tbody id="exam-checkpoints-body"></tbody></table></div>
+          </section>
           <div class="annual-actions"><button class="copy-all-button" id="copy-allocation" type="button">月別配当をコピー</button><button class="copy-all-button secondary" id="copy-annual-result" type="button">計算結果をまとめてコピー</button><button class="reset-button" id="reset-annual" type="button">入力をリセット</button></div>
         </section>
       </div>

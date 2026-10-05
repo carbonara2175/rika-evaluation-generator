@@ -4,7 +4,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const {
   regularScheduleStorageKey, normalizeRegularSchedule, hasRegularScheduleSlot,
-  dateOnlyToUtc, calculateScheduleProjection
+  dateOnlyToUtc, calculateScheduleProjection, calculateExamCheckpoints
 } = require("./regular-schedule");
 
 test("storage keys separate school, year, and course", () => {
@@ -99,4 +99,33 @@ test("an unnamed event uses its category as the exclusion reason", () => {
 test("date-only validation is independent of the runtime local timezone", () => {
   assert.equal(dateOnlyToUtc("2026-05-18").getUTCDay(), 1);
   assert.equal(dateOnlyToUtc("2026-02-30"), null);
+});
+
+test("exam checkpoints split periods after the previous exam end and accumulate from fiscal-year start", () => {
+  const slots = [{ dayOfWeek: "monday", period: 1 }];
+  const events = [
+    { startDate: "2026-04-13", endDate: "2026-04-15", title: "中間考査", category: "exam", regularClassesAvailable: false },
+    { startDate: "2026-04-27", endDate: "2026-04-28", title: "期末考査", category: "exam", regularClassesAvailable: false }
+  ];
+  const result = calculateExamCheckpoints(2026, slots, events);
+
+  assert.deepEqual(result.map(({ title, startDate, endDate, periodHours, cumulativeHours }) =>
+    ({ title, startDate, endDate, periodHours, cumulativeHours })), [
+    { title: "中間考査", startDate: "2026-04-13", endDate: "2026-04-15", periodHours: 1, cumulativeHours: 1 },
+    { title: "期末考査", startDate: "2026-04-27", endDate: "2026-04-28", periodHours: 1, cumulativeHours: 2 }
+  ]);
+});
+
+test("exam days are excluded once by the shared projection instead of subtracted again", () => {
+  const slots = [{ dayOfWeek: "monday", period: 1 }, { dayOfWeek: "wednesday", period: 1 }];
+  const events = [
+    { startDate: "2026-04-13", endDate: "2026-04-15", category: "exam", regularClassesAvailable: false },
+    { startDate: "2026-04-20", category: "school_event", regularClassesAvailable: false },
+    { startDate: "2026-04-27", category: "exam", regularClassesAvailable: false }
+  ];
+  const [first, second] = calculateExamCheckpoints(2026, slots, events);
+
+  assert.equal(first.periodHours, 3);
+  assert.equal(second.periodHours, 1);
+  assert.equal(second.cumulativeHours, 4);
 });
