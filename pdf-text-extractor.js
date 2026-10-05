@@ -13,32 +13,10 @@ function pdfTextItemsToText(items) {
       y: Number(item.transform?.[5]) || 0,
       width: Math.max(0, Number(item.width) || 0),
       height: Math.max(1, Math.abs(Number(item.height) || Number(item.transform?.[3]) || 10))
-    }))
-    .sort((a, b) => b.y - a.y || a.x - b.x);
+    }));
 
-  const lines = [];
-  positioned.forEach((item) => {
-    const tolerance = Math.max(2, item.height * 0.45);
-    let line = lines.find((candidate) => Math.abs(candidate.y - item.y) <= tolerance);
-    if (!line) {
-      line = { y: item.y, items: [] };
-      lines.push(line);
-    }
-    line.items.push(item);
-  });
-
-  return lines
-    .sort((a, b) => b.y - a.y)
-    .map((line) => {
-      const lineItems = line.items.sort((a, b) => a.x - b.x);
-      return lineItems.reduce((text, item, index) => {
-        if (!index) return item.text;
-        const previous = lineItems[index - 1];
-        const gap = item.x - (previous.x + previous.width);
-        const typicalCharacterWidth = previous.width / Math.max(previous.text.length, 1);
-        return `${text}${gap > Math.max(1.5, typicalCharacterWidth * 0.35) ? " " : ""}${item.text}`;
-      }, "");
-    })
+  return clusterTextLines(positioned, 0.45)
+    .map((line) => positionedLineText(line).text)
     .join("\n");
 }
 
@@ -65,42 +43,10 @@ const median = (numbers) => {
   return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
 };
 
-function monthOccurrences(item) {
-  const text = String(item.text ?? "").normalize("NFKC");
-  const matches = [...text.matchAll(/(?:1[0-2]|[1-9])\s*月/g)];
-  return matches.map((match) => {
-    // PDF.js may return a whole header row as one item. In that case its width
-    // still describes the complete string, so interpolate each label's centre
-    // within that width rather than relying on document-specific coordinates.
-    const relativeCenter = (match.index + match[0].length / 2) / Math.max(text.length, 1);
-    return { ...item, text: match[0], month: Number(match[0].match(/\d+/)[0]),
-      x: item.x + item.width * relativeCenter, width: 0, source: item };
-  });
-}
-
-function findMonthHeaders(items, pageHeight) {
-  // NFKC normalization is deliberately limited to recognizing table labels. The
-  // original item text is retained for the cell output.
-  const candidates = items.flatMap(monthOccurrences);
-  let best = [];
-  candidates.forEach((anchor) => {
-    const tolerance = Math.max(4, anchor.height * 1.5, pageHeight * 0.012);
-    const band = candidates.filter((item) => Math.abs(item.y - anchor.y) <= tolerance)
-      .sort((a, b) => centerX(a) - centerX(b));
-    for (let start = 0; start <= band.length - FISCAL_MONTHS.length; start += 1) {
-      const headers = band.slice(start, start + FISCAL_MONTHS.length);
-      if (headers.every((item, index) => item.month === FISCAL_MONTHS[index])) {
-        if (!best.length || median(headers.map((item) => item.y)) > median(best.map((item) => item.y))) best = headers;
-      }
-    }
-  });
-  return best;
-}
-
-function clusterTextLines(items) {
+function clusterTextLines(items, toleranceRatio = 0.55) {
   const lines = [];
   [...items].sort((a, b) => b.y - a.y || a.x - b.x).forEach((item) => {
-    const tolerance = Math.max(2, item.height * 0.55);
+    const tolerance = Math.max(2, item.height * toleranceRatio);
     let line = lines.find((candidate) => Math.abs(candidate.y - item.y) <= tolerance);
     if (!line) {
       line = { y: item.y, items: [] };
@@ -109,6 +55,56 @@ function clusterTextLines(items) {
     line.items.push(item);
   });
   return lines.map((line) => ({ ...line, items: line.items.sort((a, b) => a.x - b.x) }));
+}
+
+/** Build the same readable line used by full-text extraction, retaining source ranges. */
+function positionedLineText(line) {
+  let text = "";
+  const ranges = [];
+  line.items.forEach((item, index) => {
+    if (index) {
+      const previous = line.items[index - 1];
+      const gap = item.x - (previous.x + previous.width);
+      const typicalCharacterWidth = previous.width / Math.max(previous.text.length, 1);
+      if (gap > Math.max(1.5, typicalCharacterWidth * 0.35)) text += " ";
+    }
+    const start = text.length;
+    text += item.text;
+    ranges.push({ start, end: text.length, item });
+  });
+  return { text, ranges };
+}
+
+function findMonthHeaders(items, pageHeight) {
+  const headerPattern = FISCAL_MONTHS.map((month) => `(${month}\\s*月)`).join("\\s*");
+  const expression = new RegExp(headerPattern);
+  let best = null;
+  clusterTextLines(items, Math.max(0.55, (Number(pageHeight) || 0) / 5000)).forEach((line) => {
+    const positionedLine = positionedLineText(line);
+    const normalizedText = positionedLine.text.normalize("NFKC");
+    const match = expression.exec(normalizedText);
+    if (!match) return;
+    let searchFrom = match.index;
+    const headers = FISCAL_MONTHS.map((month, index) => {
+      const label = match[index + 1];
+      const start = normalizedText.indexOf(label, searchFrom);
+      const end = start + label.length;
+      searchFrom = end;
+      const sourceRanges = positionedLine.ranges.filter((range) => range.end > start && range.start < end);
+      const xValues = sourceRanges.map(({ start: itemStart, item }) => {
+        const overlapStart = Math.max(start, itemStart) - itemStart;
+        const overlapEnd = Math.min(end, itemStart + item.text.length) - itemStart;
+        return item.x + item.width * (((overlapStart + overlapEnd) / 2) / Math.max(item.text.length, 1));
+      });
+      const x = median(xValues);
+      return { text: label, month, x, y: median(line.items.map((item) => item.y)), width: 0,
+        source: sourceRanges.length === 1 ? sourceRanges[0].item : null,
+        sources: sourceRanges.map((range) => range.item) };
+    });
+    const candidate = { headers, text: FISCAL_MONTHS.map((month) => `${month}月`).join(" ") };
+    if (!best || median(headers.map((header) => header.y)) > median(best.headers.map((header) => header.y))) best = candidate;
+  });
+  return best || { headers: [], text: "" };
 }
 
 function leadingDay(text) {
@@ -177,11 +173,15 @@ function restoreAnnualCalendar(page, fiscalYear) {
   const items = rawItems.flatMap(splitPositionedItem);
   const debug = {
     itemCount: rawItems.length,
-    monthHeaderCandidates: rawItems.filter((item) => monthOccurrences(item).length).map((item) => item.text),
+    monthHeaderCandidates: [],
+    monthHeaderLine: "",
     dayRowCandidates: clusterTextLines(items).map((line) => line.items.map((item) => item.text).join(" "))
       .filter((text) => leadingDay(text))
   };
-  const monthHeaders = findMonthHeaders(rawItems, page.height || 0);
+  const recognizedHeader = findMonthHeaders(rawItems, page.height || 0);
+  const monthHeaders = recognizedHeader.headers;
+  debug.monthHeaderLine = recognizedHeader.text;
+  debug.monthHeaderCandidates = recognizedHeader.text ? [recognizedHeader.text] : [];
   if (monthHeaders.length !== 12) return { ok: false, error: "月列を正しく認識できませんでした", monthHeaders, dayRows: [], cells: [], debug };
   const dayRows = findDayRows(items);
   if (dayRows.length !== 31) return {
@@ -195,7 +195,7 @@ function restoreAnnualCalendar(page, fiscalYear) {
   const monthBounds = makeBoundaries(monthHeaders.map(centerX));
   const rowsTopDown = [...dayRows].sort((a, b) => b.y - a.y);
   const rowBounds = makeBoundaries(rowsTopDown.map((row) => -row.y)).map((value) => -value);
-  const excluded = new Set([...monthHeaders, ...monthHeaders.map((header) => header.source),
+  const excluded = new Set([...monthHeaders, ...monthHeaders.flatMap((header) => header.sources || [header.source]),
     ...dayRows.flatMap((row) => row.sources)]);
   const buckets = new Map();
   items.forEach((item) => {
@@ -361,9 +361,11 @@ function initializePdfImport() {
         const days = page.dayRows.map((row) => `${row.day}日 y=${row.y.toFixed(1)}`).join(", ");
         return `${index + 1}ページ\n取得したtext item数: ${page.debug.itemCount}`
           + `\n月ヘッダー候補として検出した文字列: ${page.debug.monthHeaderCandidates.join(" | ") || "なし"}`
+          + `\n月ヘッダー行: ${page.debug.monthHeaderLine || "認識なし"}`
           + `\n日付行候補として検出した先頭文字列: ${page.debug.dayRowCandidates.join(" | ") || "なし"}`
           + `\n認識月数: ${page.monthHeaders.length}\n認識日付行数: ${page.dayRows.length}`
-          + `\n月列: ${months || "認識なし"}\n日付行: ${days || "認識なし"}`;
+          + `\n各月中心x:\n${months ? page.monthHeaders.map((header) => `${header.month}月 x=${header.x.toFixed(1)}`).join("\n") : "認識なし"}`
+          + `\n日付行: ${days || "認識なし"}`;
       }).join("\n\n");
       resultPanel.hidden = false;
       if (result.combinedText.replace(/\s/g, "").length < 5) {
