@@ -4,7 +4,8 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const {
   calculateAnnualHours, calculateExpectedHours, calculateUnitHoursTotal,
-  calculateOperationalDifference, annualEventReferenceYearStorageKey, selectExpectedHours
+  calculateOperationalDifference, annualEventReferenceYearStorageKey, selectExpectedHours,
+  buildUnitLessonTimeline, endpointId, findAutomaticExamRange, calculateExamRangeDifference
 } = require("./annual-hours");
 
 test("standard annual hours remain credits times 35", () => {
@@ -65,4 +66,27 @@ test("non-negative operational difference represents projected surplus", () => {
 
   assert.ok(rawDifference >= 0);
   assert.equal(Math.round(Math.abs(rawDifference)), 3);
+});
+
+test("unit lesson timeline follows curriculum order and does not invent missing rows", () => {
+  const units = [{ id: "motion", unit: "運動の表し方" }, { id: "forces", unit: "様々な力とその働き" }];
+  const result = buildUnitLessonTimeline(units, [
+    { unitId: "forces", allocatedHours: 3, rows: [{ hour: 1 }] },
+    { unitId: "motion", allocatedHours: 2, rows: [{ hour: 1 }, { hour: 2 }] }
+  ]);
+  assert.deepEqual(result.lessons.map(({ unitId, hour, cumulativeHours }) => ({ unitId, hour, cumulativeHours })), [
+    { unitId: "motion", hour: 1, cumulativeHours: 1 },
+    { unitId: "motion", hour: 2, cumulativeHours: 2 },
+    { unitId: "forces", hour: 1, cumulativeHours: 3 }
+  ]);
+  assert.match(result.warnings[0], /2時間分不足/);
+});
+
+test("exam candidate reaches the first hour after a nine-hour opening unit", () => {
+  const motion = Array.from({ length: 9 }, (_, index) => ({ unitId: "motion", unitName: "運動の表し方", hour: index + 1, cumulativeHours: index + 1 }));
+  const force1 = { unitId: "forces", unitName: "様々な力とその働き", hour: 1, cumulativeHours: 10 };
+  const candidate = findAutomaticExamRange([...motion, force1], 10);
+  assert.equal(endpointId(candidate), "forces:1");
+  assert.equal(calculateExamRangeDifference(10, motion[8]), 1);
+  assert.equal(calculateExamRangeDifference(10, { ...force1, cumulativeHours: 12 }), -2);
 });

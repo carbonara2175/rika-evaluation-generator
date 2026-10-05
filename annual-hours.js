@@ -47,8 +47,47 @@ function selectExpectedHours(eventProjection, fallbackHours) {
   };
 }
 
+// Build one subject-wide timeline from the existing curriculum order. Only
+// rows actually present in saved plans are included; missing lessons are never
+// invented to make the allocation add up.
+function buildUnitLessonTimeline(orderedUnits, savedPlans) {
+  const plansByUnit = new Map((Array.isArray(savedPlans) ? savedPlans : []).map((plan) => [plan?.unitId, plan]));
+  const lessons = [];
+  const warnings = [];
+  (Array.isArray(orderedUnits) ? orderedUnits : []).forEach((unit) => {
+    const plan = plansByUnit.get(unit?.id);
+    if (!plan) return;
+    const rows = Array.isArray(plan.rows) ? plan.rows : [];
+    const allocatedHours = Math.max(0, Math.trunc(Number(plan.allocatedHours) || 0));
+    if (rows.length < allocatedHours) warnings.push(`${unit.unit}：単元指導計画の時間データが${allocatedHours - rows.length}時間分不足しています`);
+    if (rows.length > allocatedHours) warnings.push(`${unit.unit}：時間データが配当時数を超えています`);
+    rows.forEach((row, index) => lessons.push({
+      unitId: unit.id,
+      unitName: unit.unit,
+      hour: Math.max(1, Math.trunc(Number(row?.hour) || index + 1)),
+      cumulativeHours: lessons.length + 1
+    }));
+  });
+  return { lessons, warnings };
+}
+
+function endpointId(endpoint) {
+  return endpoint ? `${endpoint.unitId}:${endpoint.hour}` : "";
+}
+
+function findAutomaticExamRange(lessons, cumulativeHours) {
+  const limit = Math.max(0, Math.trunc(Number(cumulativeHours) || 0));
+  return (Array.isArray(lessons) ? lessons : []).filter((lesson) => lesson.cumulativeHours <= limit).at(-1) || null;
+}
+
+function calculateExamRangeDifference(projectedHours, endpoint) {
+  if (!endpoint) return null;
+  return (Number(projectedHours) || 0) - endpoint.cumulativeHours;
+}
+
 if (typeof module !== "undefined") module.exports = {
   calculateAnnualHours, calculateExpectedHours, calculateProportionalAllocation,
   allocateByLargestRemainder, calculateUnitHoursTotal, calculateOperationalDifference,
-  annualEventReferenceYearStorageKey, selectExpectedHours
+  annualEventReferenceYearStorageKey, selectExpectedHours, buildUnitLessonTimeline,
+  endpointId, findAutomaticExamRange, calculateExamRangeDifference
 };
