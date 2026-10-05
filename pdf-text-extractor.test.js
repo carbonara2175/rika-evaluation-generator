@@ -93,6 +93,33 @@ test("annual calendar is restored from dynamic month columns and day rows", () =
   assert.equal(result.cells.some((cell) => cell.text.includes("タイトル")), false);
 });
 
+test("calendar restoration recognizes full-width labels and removes positioned table metadata", () => {
+  const months = [4, 5, 6, 7, 8, 9, 10, 11, 12, 1, 2, 3];
+  const fullWidth = (value) => String(value).replace(/[0-9]/g, (digit) => String.fromCharCode(digit.charCodeAt(0) + 0xfee0));
+  const items = months.map((month, index) => positioned(`${fullWidth(month)} 月`, 55 + index * 70, 560, 18));
+  for (let day = 1; day <= 31; day += 1) {
+    const y = 530 - (day - 1) * 15;
+    items.push(positioned(fullWidth(day), 5, y), positioned(fullWidth(day), 895, y));
+  }
+  const holidays = [
+    [4, 29, "昭和の日"], [5, 3, "憲法記念日"], [5, 4, "みどりの日"], [5, 5, "こどもの日"],
+    [7, 20, "海の日"], [8, 11, "山の日"], [9, 21, "敬老の日"], [9, 23, "秋分の日"]
+  ];
+  holidays.forEach(([month, day, name]) => {
+    const x = 55 + months.indexOf(month) * 70;
+    const y = 530 - (day - 1) * 15;
+    items.push(positioned("水 □", x - 12, y), positioned(name, x, y, 40));
+  });
+
+  const result = restoreAnnualCalendar({ width: 910, height: 600, items }, 2026);
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.cells.map(({ date, text }) => [date, text]), [
+    ["2026-04-29", "昭和の日"], ["2026-05-03", "憲法記念日"], ["2026-05-04", "みどりの日"],
+    ["2026-05-05", "こどもの日"], ["2026-07-20", "海の日"], ["2026-08-11", "山の日"],
+    ["2026-09-21", "敬老の日"], ["2026-09-23", "秋分の日"]
+  ]);
+});
+
 test("calendar restoration fails safely when headers or rows are incomplete", () => {
   assert.deepEqual(restoreAnnualCalendar({ width: 800, height: 600, items: [] }, 2026), {
     ok: false, error: "月列を正しく認識できませんでした", monthHeaders: [], dayRows: [], cells: []

@@ -44,6 +44,8 @@ function pdfTextItemsToText(items) {
 
 const FISCAL_MONTHS = [4, 5, 6, 7, 8, 9, 10, 11, 12, 1, 2, 3];
 
+const normalizeCalendarToken = (value) => String(value ?? "").normalize("NFKC").replace(/\s+/g, "").trim();
+
 function normalizePdfItem(item, pageNumber) {
   return {
     text: typeof item?.str === "string" ? item.str.trim() : "",
@@ -64,13 +66,15 @@ const median = (numbers) => {
 };
 
 function findMonthHeaders(items, pageHeight) {
-  const candidates = items.filter((item) => /^(?:[1-9]|1[0-2])月$/.test(item.text));
+  // NFKC normalization is deliberately limited to recognizing table labels. The
+  // original item text is retained for the cell output.
+  const candidates = items.filter((item) => /^(?:[1-9]|1[0-2])月$/.test(normalizeCalendarToken(item.text)));
   let best = [];
   candidates.forEach((anchor) => {
     const tolerance = Math.max(4, anchor.height * 1.5, pageHeight * 0.012);
     const band = candidates.filter((item) => Math.abs(item.y - anchor.y) <= tolerance);
     const headers = FISCAL_MONTHS.map((month) => {
-      const matches = band.filter((item) => item.text === `${month}月`);
+      const matches = band.filter((item) => normalizeCalendarToken(item.text) === `${month}月`);
       return matches.sort((a, b) => Math.abs(a.y - anchor.y) - Math.abs(b.y - anchor.y))[0];
     });
     if (headers.every(Boolean) && headers.every((item, index) => !index || centerX(item) > centerX(headers[index - 1]))) {
@@ -82,13 +86,13 @@ function findMonthHeaders(items, pageHeight) {
 
 function findDayRows(items, pageWidth) {
   const candidates = items.filter((item) => {
-    if (!/^(?:[1-9]|[12]\d|3[01])$/.test(item.text)) return false;
+    if (!/^(?:[1-9]|[12]\d|3[01])$/.test(normalizeCalendarToken(item.text))) return false;
     const x = centerX(item);
     return x <= pageWidth * 0.15 || x >= pageWidth * 0.85;
   });
   return Array.from({ length: 31 }, (_, index) => {
     const day = index + 1;
-    const matches = candidates.filter((item) => Number(item.text) === day);
+    const matches = candidates.filter((item) => Number(normalizeCalendarToken(item.text)) === day);
     return matches.length ? { day, y: median(matches.map((item) => item.y)), sources: matches } : null;
   }).filter(Boolean);
 }
@@ -101,7 +105,12 @@ function makeBoundaries(positions) {
 }
 
 function joinCellItems(items) {
-  const ordered = [...items].sort((a, b) => b.y - a.y || a.x - b.x);
+  // Weekday/status columns are table metadata rather than event text. Since the
+  // decision is made on each positioned item (not combinedText), event names
+  // containing these characters remain untouched.
+  const structuralToken = /^[月火水木金土日・□■△▲○●◎◇◆]+$/;
+  const ordered = items.filter((item) => !structuralToken.test(normalizeCalendarToken(item.text)))
+    .sort((a, b) => b.y - a.y || a.x - b.x);
   const lines = [];
   ordered.forEach((item) => {
     const tolerance = Math.max(1.5, item.height * 0.4);
@@ -154,7 +163,9 @@ function restoreAnnualCalendar(page, fiscalYear) {
     const year = month >= 4 ? Number(fiscalYear) : Number(fiscalYear) + 1;
     const date = new Date(Date.UTC(year, month - 1, day));
     if (date.getUTCMonth() !== month - 1) return;
-    cells.push({ date: `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`, month, day, text: joinCellItems(cellItems), items: cellItems });
+    const text = joinCellItems(cellItems);
+    if (!text) return;
+    cells.push({ date: `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`, month, day, text, items: cellItems });
   });
   cells.sort((a, b) => a.date.localeCompare(b.date));
   return {
@@ -272,9 +283,12 @@ function initializePdfImport() {
         const cells = successful.flatMap((page) => page.cells);
         calendarMessage.textContent = `12か月・31日の日付行を認識しました（内容のあるセル: ${cells.length}件）。確認用のため年間行事には登録されません。`;
         monthSelect.hidden = false;
-        monthSelect.replaceChildren(...FISCAL_MONTHS.map((month) => new Option(`${month}月`, String(month))));
+        monthSelect.replaceChildren(new Option("すべて", "all"),
+          ...FISCAL_MONTHS.map((month) => new Option(`${month}月`, String(month))));
         const render = () => {
-          const visible = cells.filter((cell) => cell.month === Number(monthSelect.value));
+          const visible = monthSelect.value === "all"
+            ? cells
+            : cells.filter((cell) => cell.month === Number(monthSelect.value));
           calendarBody.replaceChildren(...visible.map((cell) => {
             const row = document.createElement("tr");
             const date = document.createElement("th"); date.scope = "row"; date.textContent = cell.date.replaceAll("-", "/");
