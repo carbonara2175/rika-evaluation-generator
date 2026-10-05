@@ -148,14 +148,37 @@ test("combined PDF text items restore Mito High School-style month headers, rows
     assert.match(result.cells.find((cell) => cell.date === date)?.text || "", new RegExp(name));
   });
   assert.deepEqual(result.debug.monthHeaderCandidates, [monthText]);
+  assert.equal(result.debug.monthHeaderLine, monthText);
   assert.equal(result.debug.dayRowCandidates.length, 31);
+});
+
+test("month header recognition uses the complete clustered line when labels are fragmented", () => {
+  const months = [4, 5, 6, 7, 8, 9, 10, 11, 12, 1, 2, 3];
+  const items = [];
+  months.forEach((month, index) => {
+    const x = 50 + index * 70;
+    const label = String(month);
+    items.push(positioned(label, x, 560, label.length * 7), positioned("月", x + label.length * 7, 560, 7));
+  });
+  for (let day = 1; day <= 31; day += 1) {
+    const y = 530 - (day - 1) * 15;
+    items.push(positioned(String(day), 5, y), positioned(String(day), 895, y));
+  }
+  items.push(positioned("昭和の日", 50, 530 - 28 * 15, 40));
+
+  const result = restoreAnnualCalendar({ width: 910, height: 600, items }, 2026);
+  assert.equal(result.ok, true);
+  assert.equal(result.monthHeaders.length, 12);
+  assert.equal(result.debug.monthHeaderLine, "4月 5月 6月 7月 8月 9月 10月 11月 12月 1月 2月 3月");
+  assert.equal(result.cells.find((cell) => cell.text === "昭和の日").date, "2026-04-29");
+  assert.equal(result.cells.some((cell) => /月/.test(cell.text)), false);
 });
 
 test("calendar restoration fails safely when headers or rows are incomplete", () => {
   const empty = restoreAnnualCalendar({ width: 800, height: 600, items: [] }, 2026);
   assert.equal(empty.ok, false);
   assert.equal(empty.error, "月列を正しく認識できませんでした");
-  assert.deepEqual(empty.debug, { itemCount: 0, monthHeaderCandidates: [], dayRowCandidates: [] });
+  assert.deepEqual(empty.debug, { itemCount: 0, monthHeaderCandidates: [], monthHeaderLine: "", dayRowCandidates: [] });
   const headers = [4, 5, 6, 7, 8, 9, 10, 11, 12, 1, 2, 3].map((month, index) => positioned(`${month}月`, 50 + index * 60, 550));
   const result = restoreAnnualCalendar({ width: 800, height: 600, items: headers }, 2026);
   assert.equal(result.ok, false);
