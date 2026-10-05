@@ -104,11 +104,46 @@ function calculateScheduleProjection(year, slots, events) {
     excludedCount: excludedSessions.length,
     availableCount: scheduledSessions.length - excludedSessions.length,
     scheduledSessions,
-    excludedSessions
+    excludedSessions,
+    availableSessions: scheduledSessions.filter((session) => !unavailableByDate.has(session.date))
   };
+}
+
+// Exams are checkpoints only. Their dates are already removed from
+// availableSessions by calculateScheduleProjection, just like every other
+// unavailable annual event.
+function calculateExamCheckpoints(year, slots, events) {
+  const fiscalYear = Math.trunc(Number(year));
+  const fiscalStart = `${fiscalYear}-04-01`;
+  const fiscalEnd = `${fiscalYear + 1}-03-31`;
+  const exams = (Array.isArray(events) ? events : []).filter((event) => event?.category === "exam")
+    .map((event) => {
+      const start = dateOnlyToUtc(event?.startDate);
+      const end = dateOnlyToUtc(event?.endDate || event?.startDate);
+      if (!start || !end || end < start) return null;
+      return {
+        id: String(event?.id || ""),
+        title: String(event?.title || "").trim() || ANNUAL_EVENT_CATEGORY_TITLES.exam,
+        startDate: utcDateOnly(start),
+        endDate: utcDateOnly(end)
+      };
+    })
+    .filter((exam) => exam && exam.startDate >= fiscalStart && exam.startDate <= fiscalEnd)
+    .sort((a, b) => a.startDate.localeCompare(b.startDate) || a.endDate.localeCompare(b.endDate));
+  const availableSessions = calculateScheduleProjection(fiscalYear, slots, events).availableSessions;
+  let periodStart = fiscalStart;
+
+  return exams.map((exam) => {
+    const periodHours = availableSessions.filter(({ date }) => date >= periodStart && date < exam.startDate).length;
+    const cumulativeHours = availableSessions.filter(({ date }) => date >= fiscalStart && date < exam.startDate).length;
+    const end = dateOnlyToUtc(exam.endDate);
+    end.setUTCDate(end.getUTCDate() + 1);
+    periodStart = utcDateOnly(end);
+    return { ...exam, periodHours, cumulativeHours };
+  });
 }
 
 if (typeof module !== "undefined") module.exports = {
   REGULAR_SCHEDULE_DAYS, regularScheduleStorageKey, normalizeRegularSchedule,
-  hasRegularScheduleSlot, dateOnlyToUtc, calculateScheduleProjection
+  hasRegularScheduleSlot, dateOnlyToUtc, calculateScheduleProjection, calculateExamCheckpoints
 };
