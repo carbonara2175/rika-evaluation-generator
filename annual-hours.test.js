@@ -2,7 +2,10 @@
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { calculateAnnualHours, calculateExpectedHours, calculateUnitHoursTotal, calculateOperationalDifference } = require("./annual-hours");
+const {
+  calculateAnnualHours, calculateExpectedHours, calculateUnitHoursTotal,
+  calculateOperationalDifference, annualEventReferenceYearStorageKey, selectExpectedHours
+} = require("./annual-hours");
 
 test("standard annual hours remain credits times 35", () => {
   assert.equal(calculateAnnualHours(2), 70);
@@ -24,6 +27,37 @@ test("operational difference compares projected hours with unit plan hours befor
   assert.ok(rawDifference < 0);
   assert.equal(Math.round(rawProjectedHours), 48);
   assert.equal(Math.round(Math.abs(rawDifference)), 14);
+});
+
+test("reference years are stored separately for every school and course", () => {
+  assert.equal(
+    annualEventReferenceYearStorageKey("sanno", "physicsBasic"),
+    "rika-annual-event-reference-year-v1:sanno:physicsBasic"
+  );
+  assert.notEqual(
+    annualEventReferenceYearStorageKey("sanno", "physicsBasic"),
+    annualEventReferenceYearStorageKey("santo", "physics")
+  );
+});
+
+test("annual-event projection takes priority only when timetable and events both exist", () => {
+  assert.deepEqual(selectExpectedHours({
+    hasRegularSchedule: true, hasAnnualEvents: true, availableCount: 59
+  }, 70), { hours: 59, source: "annual-events" });
+  assert.deepEqual(selectExpectedHours({
+    hasRegularSchedule: true, hasAnnualEvents: false, availableCount: 104
+  }, 70), { hours: 70, source: "available-days" });
+  assert.deepEqual(selectExpectedHours({
+    hasRegularSchedule: false, hasAnnualEvents: true, availableCount: 0
+  }, 70), { hours: 70, source: "available-days" });
+});
+
+test("the requested 59-hour projection produces a three-hour shortage against 62 hours", () => {
+  const expected = selectExpectedHours({
+    hasRegularSchedule: true, hasAnnualEvents: true, availableCount: 59
+  }, 0);
+  assert.equal(calculateOperationalDifference(expected.hours, 62), -3);
+  assert.equal(calculateAnnualHours(2), 70);
 });
 
 test("non-negative operational difference represents projected surplus", () => {

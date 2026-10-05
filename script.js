@@ -134,6 +134,7 @@ const creditsInput = document.querySelector("#credits");
 const weeklyHoursInput = document.querySelector("#weekly-hours");
 const actualHoursInput = document.querySelector("#actual-hours");
 const monthInputs = document.querySelector("#month-inputs");
+const annualEventsReferenceYear = document.querySelector("#annual-events-reference-year");
 
 function selectedSubject() {
   return SUBJECTS.find(({ subject }) => subject === subjectSelect.value) || SUBJECTS[0];
@@ -274,6 +275,40 @@ function annualStorageKey() {
   return `${ANNUAL_STORAGE_PREFIX}${schoolId}_${courseId}`;
 }
 
+function selectedAnnualEventsReferenceYear() {
+  return Math.min(2100, Math.max(2000, Math.trunc(Number(annualEventsReferenceYear.value) || new Date().getFullYear())));
+}
+
+function loadAnnualEventsReferenceYear() {
+  const { schoolId, courseId } = annualIds();
+  const saved = Number(localStorage.getItem(annualEventReferenceYearStorageKey(schoolId, courseId)));
+  return Number.isInteger(saved) && saved >= 2000 && saved <= 2100 ? saved : new Date().getFullYear();
+}
+
+function saveAnnualEventsReferenceYear() {
+  const { schoolId, courseId } = annualIds();
+  try {
+    localStorage.setItem(annualEventReferenceYearStorageKey(schoolId, courseId), String(selectedAnnualEventsReferenceYear()));
+  } catch { /* Storage may be disabled by the browser. */ }
+}
+
+function annualEventProjection() {
+  const { schoolId, courseId } = annualIds();
+  const year = selectedAnnualEventsReferenceYear();
+  let slots = [];
+  let events = [];
+  try {
+    slots = normalizeRegularSchedule(JSON.parse(localStorage.getItem(regularScheduleStorageKey(schoolId, year, courseId))));
+    const savedEvents = JSON.parse(localStorage.getItem(annualEventsStorageKey(schoolId, year)));
+    events = Array.isArray(savedEvents) ? sortAnnualEvents(savedEvents) : [];
+  } catch { /* Invalid or unavailable storage is treated as missing data. */ }
+  return {
+    ...calculateScheduleProjection(year, slots, events),
+    hasRegularSchedule: slots.length > 0,
+    hasAnnualEvents: events.length > 0
+  };
+}
+
 function annualPreset() {
   const school = SCHOOLS[annualSchool.value] || SCHOOLS.sanno;
   return school.courses[annualSubject.value] || Object.values(school.courses)[0];
@@ -322,6 +357,7 @@ function applyAnnualState(resetToPreset = false) {
   creditsInput.value = saved?.credits ?? preset.credits;
   weeklyHoursInput.value = saved?.weeklyHours ?? preset.weeklyHours;
   [...monthInputs.querySelectorAll("input")].forEach((input, index) => { input.value = saved?.days?.[index] ?? 0; });
+  annualEventsReferenceYear.value = loadAnnualEventsReferenceYear();
 }
 
 function renderAnnual() {
@@ -329,7 +365,8 @@ function renderAnnual() {
   const annualHours = calculateAnnualHours(state.credits);
   const totalDays = state.days.reduce((sum, value) => sum + value, 0);
   const rawProjectedHours = calculateExpectedHours(totalDays, state.weeklyHours);
-  const rawDifference = calculateOperationalDifference(rawProjectedHours, state.actualHours);
+  const expected = selectExpectedHours(annualEventProjection(), rawProjectedHours);
+  const rawDifference = calculateOperationalDifference(expected.hours, state.actualHours);
   const allocations = allocateByLargestRemainder(annualHours, state.days);
   const allocated = allocations.reduce((sum, value) => sum + value, 0);
   const marginHours = annualHours - state.actualHours;
@@ -339,7 +376,10 @@ function renderAnnual() {
   document.querySelector("#summary-actual").textContent = `${state.actualHours}時間`;
   document.querySelector("#summary-margin").textContent = `${marginHours}時間`;
   document.querySelector("#summary-days").textContent = `${totalDays}日`;
-  document.querySelector("#summary-expected").textContent = `${Math.round(rawProjectedHours)}時間`;
+  document.querySelector("#summary-expected").textContent = `${Math.round(expected.hours)}時間`;
+  document.querySelector("#summary-expected-source").textContent = expected.source === "annual-events"
+    ? `${selectedAnnualEventsReferenceYear()}年度の通常時間割・年間行事から算出`
+    : "年間行事データ未設定のため授業可能日数ベース概算値";
   document.querySelector("#summary-difference-label").textContent = rawDifference < 0 ? "不足見込み" : "余裕見込み";
   document.querySelector("#summary-difference").textContent = `${Math.round(Math.abs(rawDifference))}時間`;
   document.querySelector("#difference-card").classList.toggle("shortage", rawDifference < 0);
@@ -351,6 +391,7 @@ function renderAnnual() {
   }));
   document.querySelector("#annual-table-foot").innerHTML = `<tr><th scope="row">合計</th><td>${totalDays}日</td><td>${rawProjectedHours.toFixed(1)}h</td><td>${allocated}h</td></tr>`;
   saveAnnualState(state);
+  saveAnnualEventsReferenceYear();
 }
 
 function allocationText() {
@@ -408,6 +449,11 @@ unitPlanTab.addEventListener("click", () => selectView("unit-plan"));
 annualEventsTab.addEventListener("click", () => selectView("annual-events"));
 annualSchool.addEventListener("change", () => { populateAnnualCourses(); applyAnnualState(); renderAnnual(); });
 annualSubject.addEventListener("change", () => { applyAnnualState(); renderAnnual(); });
+[annualEventsReferenceYear].forEach((input) => input.addEventListener("change", () => {
+  input.value = selectedAnnualEventsReferenceYear();
+  saveAnnualEventsReferenceYear();
+  renderAnnual();
+}));
 [creditsInput, weeklyHoursInput, customSchoolName, customSubjectName].forEach((input) => input.addEventListener("input", renderAnnual));
 monthInputs.addEventListener("input", renderAnnual);
 monthInputs.addEventListener("change", (event) => {
@@ -420,9 +466,11 @@ document.querySelector("#copy-annual-result").addEventListener("click", () => {
   const annualHours = calculateAnnualHours(state.credits);
   const totalDays = state.days.reduce((sum, value) => sum + value, 0);
   const rawProjectedHours = calculateExpectedHours(totalDays, state.weeklyHours);
-  const rawDifference = calculateOperationalDifference(rawProjectedHours, state.actualHours);
+  const expected = selectExpectedHours(annualEventProjection(), rawProjectedHours);
+  const rawDifference = calculateOperationalDifference(expected.hours, state.actualHours);
   const differenceLabel = rawDifference < 0 ? "不足見込み" : "余裕見込み";
-  copyText(`学校：${state.schoolName}\n科目：${state.courseName}\n単位数：${state.credits}単位\n標準年間時数：${annualHours}時間\n単元指導計画時数：${state.actualHours}時間\n授業実施見込み：${Math.round(rawProjectedHours)}時間\n${differenceLabel}：${Math.round(Math.abs(rawDifference))}時間\n授業可能日数：${totalDays}日\n標準時数との差：${annualHours - state.actualHours}時間（実施上の余裕ではありません）\n\n月別配当\n${allocationText()}`);
+  const expectedSource = expected.source === "annual-events" ? `${selectedAnnualEventsReferenceYear()}年度の通常時間割・年間行事から算出` : "年間行事データ未設定のため授業可能日数ベース概算値";
+  copyText(`学校：${state.schoolName}\n科目：${state.courseName}\n単位数：${state.credits}単位\n標準年間時数：${annualHours}時間\n単元指導計画時数：${state.actualHours}時間\n授業実施見込み：${Math.round(expected.hours)}時間（${expectedSource}）\n${differenceLabel}：${Math.round(Math.abs(rawDifference))}時間\n授業可能日数：${totalDays}日\n標準時数との差：${annualHours - state.actualHours}時間（実施上の余裕ではありません）\n\n月別配当\n${allocationText()}`);
 });
 document.querySelector("#reset-annual").addEventListener("click", () => {
   localStorage.removeItem(annualStorageKey());
@@ -817,6 +865,7 @@ function saveAnnualEvents(events) {
     localStorage.setItem(annualEventsStorageKey(eventsSchool.value, selectedEventsYear()), JSON.stringify(sortAnnualEvents(events)));
     localStorage.setItem(EVENTS_SELECTION_KEY, JSON.stringify({ schoolId: eventsSchool.value, year: selectedEventsYear() }));
   } catch { /* Storage may be disabled by the browser. */ }
+  renderAnnual();
 }
 
 function scheduleStorageKey() {
@@ -831,6 +880,7 @@ function loadRegularSchedule() {
 function saveRegularSchedule(slots) {
   try { localStorage.setItem(scheduleStorageKey(), JSON.stringify(normalizeRegularSchedule(slots))); }
   catch { /* Storage may be disabled by the browser. */ }
+  renderAnnual();
 }
 
 function renderRegularSchedule() {

@@ -33,4 +33,22 @@ function calculateOperationalDifference(projectedHours, unitPlanHours) {
   return (Number(projectedHours) || 0) - (Number(unitPlanHours) || 0);
 }
 
-if (typeof module !== "undefined") module.exports = { calculateAnnualHours, calculateExpectedHours, calculateProportionalAllocation, allocateByLargestRemainder, calculateUnitHoursTotal, calculateOperationalDifference };
+function annualEventReferenceYearStorageKey(schoolId, courseId) {
+  return `rika-annual-event-reference-year-v1:${schoolId}:${courseId}`;
+}
+
+function selectExpectedHours(eventProjection, fallbackHours) {
+  const hasEventProjection = eventProjection?.hasRegularSchedule === true
+    && eventProjection?.hasAnnualEvents === true
+    && Number.isFinite(eventProjection?.availableCount);
+  return {
+    hours: hasEventProjection ? eventProjection.availableCount : (Number(fallbackHours) || 0),
+    source: hasEventProjection ? "annual-events" : "available-days"
+  };
+}
+
+if (typeof module !== "undefined") module.exports = {
+  calculateAnnualHours, calculateExpectedHours, calculateProportionalAllocation,
+  allocateByLargestRemainder, calculateUnitHoursTotal, calculateOperationalDifference,
+  annualEventReferenceYearStorageKey, selectExpectedHours
+};

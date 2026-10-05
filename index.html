@@ -8,11 +8,11 @@
     <link rel="stylesheet" href="style.css?v=1.6.2">
     <script src="https://cdn.jsdelivr.net/npm/pizzip@3.2.0/dist/pizzip.min.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/docxtemplater@3.62.0/build/docxtemplater.js" defer></script>
-    <script src="annual-hours.js?v=1.5.1" defer></script>
+    <script src="annual-hours.js?v=1.6.0" defer></script>
     <script src="annual-events.js?v=1.0.1" defer></script>
     <script src="national-holidays.js?v=1.0.0" defer></script>
     <script src="regular-schedule.js?v=1.1.1" defer></script>
-    <script src="script.js?v=1.6.3" defer></script>
+    <script src="script.js?v=1.7.0" defer></script>
   </head>
   <body>
     <header class="site-header">
@@ -101,6 +101,7 @@
             <label class="field custom-annual-field" id="custom-school-field" hidden><span>学校名</span><input id="custom-school-name" type="text" placeholder="学校名を入力"></label>
             <label class="field"><span>科目</span><select id="annual-subject" aria-label="年間時数を配分する科目"></select></label>
             <label class="field custom-annual-field" id="custom-subject-field" hidden><span>科目名</span><input id="custom-subject-name" type="text" placeholder="科目名を入力"></label>
+            <label class="field"><span>年間行事参照年度</span><span class="year-input"><input id="annual-events-reference-year" type="number" min="2000" max="2100" step="1" inputmode="numeric"><small>年度</small></span></label>
             <label class="field"><span>単位数</span><input id="credits" type="number" min="1" max="10" step="1" value="2"></label>
             <div class="field readonly-field"><span>標準年間時数</span><output id="standard-hours">70時間</output><small>単位数 × 35単位時間</small></div>
             <label class="field"><span>週時数</span><input id="weekly-hours" type="number" min="0" max="50" step="0.1" value="2"></label>
@@ -114,11 +115,11 @@
         </section>
 
         <section class="annual-results" aria-labelledby="results-heading">
-          <div class="output-heading-row"><div class="section-heading"><span class="step-number" aria-hidden="true">03</span><div><h2 id="results-heading">計算結果</h2><p>授業実施見込みは、授業可能日数と週時数から算出した概算です。</p></div></div></div>
+          <div class="output-heading-row"><div class="section-heading"><span class="step-number" aria-hidden="true">03</span><div><h2 id="results-heading">計算結果</h2><p>授業実施見込みは、参照年度の通常時間割・年間行事を優先して算出します。</p></div></div></div>
           <div class="summary-grid">
             <article><span>標準年間時数</span><strong id="summary-standard">70時間</strong></article>
             <article class="actual-hours-card"><span>単元指導計画時数</span><strong id="summary-actual">0時間</strong><small>単元指導計画から自動集計</small></article>
-            <article class="expected-card"><span>授業実施見込み</span><strong id="summary-expected">0時間</strong><small>授業可能日数・週時数から算出</small></article>
+            <article class="expected-card"><span>授業実施見込み</span><strong id="summary-expected">0時間</strong><small id="summary-expected-source">年間行事データ未設定のため概算値</small></article>
             <article class="difference-card" id="difference-card"><span id="summary-difference-label">余裕見込み</span><strong id="summary-difference">0時間</strong><small>授業実施見込み − 単元指導計画時数</small></article>
             <article><span>授業可能日数</span><strong id="summary-days">0日</strong></article>
             <article><span>年計上の配当</span><strong id="summary-allocation">0 / 70時間</strong></article>
