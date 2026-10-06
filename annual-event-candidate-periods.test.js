@@ -5,6 +5,38 @@ const assert = require("node:assert/strict");
 const { inferAnnualEventCandidates } = require("./annual-events");
 const { prepareAnnualEventCandidates, formatCandidatePeriod, candidatePeriodIncludesMonth } = require("./annual-event-candidate-periods");
 
+test("uploaded Sannohe R8 PDF cells retain all 99 sources in 67 periods and the five requested examples", () => {
+  // Actual cells captured via unchanged extractPdfText/restoreAnnualCalendar,
+  // using PDF.js 3.11.174. This fixture checks extraction-rule/post-process
+  // integration; the PDF binary itself is not included in the repository.
+  const { cells } = require("./test-fixtures/sannohe-r8-calendar-cells.json");
+  const extracted = inferAnnualEventCandidates(cells);
+  const periods = prepareAnnualEventCandidates(extracted);
+  assert.equal(cells.length, 185);
+  assert.equal(extracted.length, 99);
+  assert.equal(periods.length, 67);
+  assert.equal(periods.filter(p => p.needsReview).length, 38);
+  assert.deepEqual(periods.flatMap(p => p.sourceCandidates).sort((a, b) =>
+    a.date.localeCompare(b.date) || a.title.localeCompare(b.title)),
+  [...extracted].sort((a, b) => a.date.localeCompare(b.date) || a.title.localeCompare(b.title)));
+  for (const [title, start, end, count] of [
+    ["期末考査", "2026-06-18", "2026-06-23", 4],
+    ["学年末考査", "2027-02-15", "2027-02-18", 4],
+    ["年末年始休", "2026-12-29", "2027-01-03", 6],
+    ["夏季休業～ 8/23", "2026-07-24", "2026-08-23", 1],
+    ["夏季休業～ 1/10", "2026-12-23", "2027-01-10", 1]
+  ]) {
+    const matching = periods.filter(p => p.title === title && p.startDate === start);
+    assert.equal(matching.length, 1, title);
+    const [period] = matching;
+    assert.equal(period.endDate, end, title);
+    assert.equal(period.sourceDates.length, count, title);
+    assert.equal(period.sourceText, title, title);
+    assert.equal(period.needsReview, start === "2026-12-23", title);
+    if (period.needsReview) assert.match(period.reviewReason, /季節名と開始時期/);
+  }
+});
+
 const raw = (date, title = "期末考査", category = "exam", available = false) => ({
   date, title, sourceText: title, suggestedCategory: category,
   suggestedRegularClassesAvailable: available, confidence: "high", reason: "検出理由"
