@@ -92,6 +92,32 @@ test("exam candidate reaches the first hour after a nine-hour opening unit", () 
   assert.equal(calculateExamRangeDifference(10, { ...force1, cumulativeHours: 12 }), -2);
 });
 
+test("subject timeline accumulates saved units in teaching order and reaches hour 33", () => {
+  const units = [
+    { id: "planar", unit: "平面内の運動と剛体のつり合い" },
+    { id: "momentum", unit: "運動量" },
+    { id: "circular", unit: "円運動と単振動" },
+    { id: "gravitation", unit: "万有引力" },
+    { id: "unsaved", unit: "気体分子の運動" }
+  ];
+  const plans = units.slice(0, 4).map((unit, index) => ({
+    unitId: unit.id, allocatedHours: [8, 9, 9, 10][index],
+    rows: Array.from({ length: [8, 9, 9, 10][index] }, (_, hour) => ({ hour: hour + 1 }))
+  })).reverse();
+  const { lessons, warnings } = buildUnitLessonTimeline(units, plans);
+  assert.equal(lessons.length, 36);
+  assert.deepEqual(lessons.map((lesson) => lesson.cumulativeHours), Array.from({ length: 36 }, (_, index) => index + 1));
+  assert.deepEqual([0, 8, 17, 26].map((index) => endpointId(lessons[index])), ["planar:1", "momentum:1", "circular:1", "gravitation:1"]);
+  assert.equal(endpointId(findAutomaticExamRange(lessons, 33)), "gravitation:7");
+  assert.equal(findAutomaticExamRange(lessons, 0), null);
+  assert.equal(endpointId(findAutomaticExamRange(lessons, 99)), "gravitation:10");
+  assert.ok(lessons.every((lesson) => lesson.unitId !== "unsaved"));
+  assert.deepEqual(warnings, ["気体分子の運動の単元指導計画が未保存のため候補に含まれていません"]);
+  const reordered = buildUnitLessonTimeline([units[1], units[0], ...units.slice(2)], plans).lessons;
+  assert.equal(endpointId(reordered[0]), "momentum:1");
+  assert.equal(endpointId(reordered[9]), "planar:1");
+});
+
 test("teaching order keeps valid saved IDs and appends newly defined units", () => {
   const units = [{ id: "motion" }, { id: "waves" }, { id: "heat" }, { id: "electricity" }];
   assert.deepEqual(reconcileTeachingOrder(units, ["motion", "heat", "removed", "heat", "waves"]), [

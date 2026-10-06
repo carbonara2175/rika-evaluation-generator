@@ -73,7 +73,10 @@ function buildUnitLessonTimeline(orderedUnits, savedPlans) {
   const warnings = [];
   (Array.isArray(orderedUnits) ? orderedUnits : []).forEach((unit) => {
     const plan = plansByUnit.get(unit?.id);
-    if (!plan) return;
+    if (!plan) {
+      warnings.push(`${unit.unit}の単元指導計画が未保存のため候補に含まれていません`);
+      return;
+    }
     const rows = Array.isArray(plan.rows) ? plan.rows : [];
     const allocatedHours = Math.max(0, Math.trunc(Number(plan.allocatedHours) || 0));
     if (rows.length < allocatedHours) warnings.push(`${unit.unit}：単元指導計画の時間データが${allocatedHours - rows.length}時間分不足しています`);
