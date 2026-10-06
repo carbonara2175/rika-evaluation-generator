@@ -35,6 +35,13 @@ test("uploaded Sannohe R8 PDF cells retain all 99 sources in 67 periods and the 
     assert.equal(period.needsReview, start === "2026-12-23", title);
     if (period.needsReview) assert.match(period.reviewReason, /季節名と開始時期/);
   }
+  for (const title of ["午前授業～ 18", "教員研修週間～ 18"]) {
+    const matching = periods.filter(p => p.title === title && p.startDate === "2026-09-14");
+    assert.equal(matching.length, 1, title);
+    assert.equal(matching[0].endDate, "2026-09-18", title);
+    assert.equal(formatCandidatePeriod(matching[0]), "2026/09/14 ～ 2026/09/18", title);
+    assert.doesNotMatch(matching[0].reviewReason, /終了日/, title);
+  }
 });
 
 const raw = (date, title = "期末考査", category = "exam", available = false) => ({
@@ -111,6 +118,44 @@ test("omitted months are inferred only when valid and not before the start", () 
     assert.equal(ambiguous.needsReview, true, title);
     assert.match(ambiguous.reviewReason, /終了日/);
     assert.match(formatCandidatePeriod(ambiguous), /終了日要確認/);
+  }
+});
+
+test("bare end days support wave variants and infer the same month from source text", () => {
+  for (const title of ["午前授業", "教員研修週間"]) {
+    for (const marker of ["～", "〜", "~"]) {
+      const [period] = prepareAnnualEventCandidates([
+        { ...raw("2026-09-14", title), sourceText: `${title}${marker}18` }
+      ]);
+      assert.equal(period.endDate, "2026-09-18");
+      assert.equal(period.needsReview, false);
+      assert.equal(formatCandidatePeriod(period), "2026/09/14 ～ 2026/09/18");
+    }
+  }
+  for (const [start, ending, end] of [
+    ["2026-09-01", "9", "2026-09-09"],
+    ["2026-09-14", "14", "2026-09-14"],
+    ["2026-09-14", "１８", "2026-09-18"],
+    ["2026-09-14", "18 ）", "2026-09-18"],
+    ["2028-02-01", "29", "2028-02-29"]
+  ]) assert.equal(prepare([start], `午前授業～${ending}`)[0].endDate, end);
+});
+
+test("invalid or non-date bare endings stay null and require review", () => {
+  for (const [start, ending] of [
+    ...["32", "0", "10", "31", "180", "018", "18:00", "18 :00", "18：00",
+      "18日間", "18 日間", "18回", "18 回", "18時間", "18/20", "18.5", "18頃"]
+      .map(ending => ["2026-09-14", ending]),
+    ["2027-02-01", "29"], ["2026-12-23", "10"]
+  ]) {
+    const [period] = prepare([start], `午前授業～${ending}`);
+    assert.equal(period.endDate, null, ending);
+    assert.equal(period.needsReview, true, ending);
+    assert.match(formatCandidatePeriod(period), /終了日要確認/, ending);
+  }
+  for (const ending of ["18:00", "18日間", "18回"]) {
+    // Without a range marker these remain single-day candidates.
+    assert.equal(prepare(["2026-09-14"], `午前授業 ${ending}`)[0].endDate, "2026-09-14");
   }
 });
 

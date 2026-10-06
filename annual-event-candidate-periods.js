@@ -25,7 +25,10 @@ function inferCandidatePeriodEnd(startDate, texts) {
       // Require a complete date token: do not accept 8/23 as part of 8/234,
       // 8/23/24, 8/23日頃 or a duration such as 13日間.
       const explicit = token.match(/^(\d{1,2})\s*\/\s*(\d{1,2})(?:日)?(?=$|[\s）)・、,。;；])/);
-      const omitted = token.match(/^(\d{1,2})日(?=$|[\s）)・、,。;；])/);
+      // Bare days need an end or punctuation boundary, even after whitespace,
+      // so times, durations, counts and longer numeric tokens remain ambiguous.
+      const omitted = token.match(/^(\d{1,2})日(?=$|[\s）)・、,。;；])/)
+        || token.match(/^(\d{1,2})(?=\s*(?:$|[）)・、,。;；]))/);
       let end = null;
       if (explicit) {
         const endMonth = Number(explicit[1]);
