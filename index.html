@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="学習指導要領の項目から、物理基礎・物理の3観点の評価規準を作成します。">
     <title>理科 評価規準ジェネレーター</title>
-    <link rel="stylesheet" href="style.css?v=1.12.0">
+    <link rel="stylesheet" href="style.css?v=1.13.0">
     <script src="https://cdn.jsdelivr.net/npm/pizzip@3.2.0/dist/pizzip.min.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/docxtemplater@3.62.0/build/docxtemplater.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js" defer></script>
@@ -14,9 +14,10 @@
     <script src="pdf-text-extractor.js?v=1.2.0" defer></script>
     <script src="national-holidays.js?v=1.0.0" defer></script>
     <script src="annual-event-candidate-periods.js?v=1.0.0" defer></script>
-    <script src="annual-event-candidates-ui.js?v=1.1.0" defer></script>
+    <script src="annual-event-candidate-registration.js?v=1.0.0" defer></script>
+    <script src="annual-event-candidates-ui.js?v=1.2.0" defer></script>
     <script src="regular-schedule.js?v=1.2.0" defer></script>
-    <script src="script.js?v=1.10.0" defer></script>
+    <script src="script.js?v=1.11.0" defer></script>
   </head>
   <body>
     <header class="site-header">
@@ -252,12 +253,33 @@
                   <label for="candidate-category">区分 <select id="candidate-category"></select></label>
                 </div>
               </div>
-              <p class="candidate-note">確認用の候補です。年間行事には登録・保存されません。連続する同一行事を期間にまとめ、原文の終了日表記から推定します。「要確認」の理由を確認してください。表示月は期間に含まれる月で絞り込みます。</p>
-              <div class="pdf-calendar-table-wrap">
-                <table><thead><tr><th scope="col">期間</th><th scope="col">抽出した行事名</th><th scope="col">区分候補</th><th scope="col">通常授業</th><th scope="col">要確認</th><th scope="col">判定理由</th></tr></thead><tbody id="candidate-body"></tbody></table>
+              <div class="candidate-actions">
+                <button id="select-safe-candidates" class="reset-button" type="button">安全な候補を選択</button>
+                <button id="select-visible-candidates" class="reset-button" type="button">表示中を選択</button>
+                <button id="deselect-candidates" class="reset-button" type="button">すべて解除</button>
+                <button id="clear-candidates" class="reset-button" type="button">候補をクリア</button>
               </div>
+              <p class="candidate-note">安全な候補のみ初期選択しています。要確認候補は「編集」で日付・通常授業可否などを確認して候補に反映してください。編集だけでは保存されません。表示月は期間に含まれる月で絞り込みます。</p>
+              <div class="pdf-calendar-table-wrap">
+                <table><thead><tr><th scope="col">登録する</th><th scope="col">期間</th><th scope="col">行事名</th><th scope="col">区分候補</th><th scope="col">通常授業</th><th scope="col">要確認</th><th scope="col">判定理由</th><th scope="col">操作・原文</th></tr></thead><tbody id="candidate-body"></tbody></table>
+              </div>
+              <button id="register-candidates" class="copy-all-button" type="button" disabled>選択した候補を年間行事へ登録</button>
+              <p id="candidate-registration-result" role="status" aria-live="polite"></p>
             </section>
           </div>
+          <dialog id="candidate-editor" aria-labelledby="candidate-editor-heading">
+            <h3 id="candidate-editor-heading">候補を編集・確認</h3>
+            <p id="candidate-editor-reason"></p>
+            <details><summary>PDF原文</summary><pre id="candidate-editor-source"></pre></details>
+            <form id="candidate-edit-form" novalidate>
+              <label class="field"><span>開始日</span><input name="startDate" type="date"></label>
+              <label class="field"><span>終了日</span><input name="endDate" type="date"></label>
+              <label class="field"><span>行事名</span><input name="title" type="text"></label>
+              <label class="field"><span>区分</span><select name="category"></select></label>
+              <label class="field"><span>通常授業</span><select name="regularClassesAvailable"><option value="true">実施できる</option><option value="false">実施できない</option><option value="null">要確認</option></select></label>
+              <div class="candidate-actions"><button class="copy-all-button" type="submit">確認して候補に反映</button><button id="candidate-edit-cancel" class="reset-button" type="button">キャンセル</button></div>
+            </form>
+          </dialog>
         </section>
 
         <section class="input-panel event-form-panel" aria-labelledby="event-form-heading">
