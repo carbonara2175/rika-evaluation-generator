@@ -5,13 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="学習指導要領の項目から、物理基礎・物理の3観点の評価規準を作成します。">
     <title>理科 評価規準ジェネレーター</title>
-    <link rel="stylesheet" href="style.css?v=1.13.0">
+    <link rel="stylesheet" href="style.css?v=1.14.0">
     <script src="https://cdn.jsdelivr.net/npm/pizzip@3.2.0/dist/pizzip.min.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/docxtemplater@3.62.0/build/docxtemplater.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js" defer></script>
     <script src="annual-hours.js?v=1.8.0" defer></script>
     <script src="annual-events.js?v=1.1.0" defer></script>
-    <script src="pdf-text-extractor.js?v=1.2.0" defer></script>
+    <script src="pdf-text-extractor.js?v=1.3.0" defer></script>
     <script src="national-holidays.js?v=1.0.0" defer></script>
     <script src="annual-event-candidate-periods.js?v=1.0.0" defer></script>
     <script src="annual-event-candidate-registration.js?v=1.0.0" defer></script>
@@ -238,12 +238,18 @@
           <p id="pdf-import-status" class="pdf-import-status" role="status" aria-live="polite">PDFを選択してください。</p>
           <div id="pdf-extraction-result" class="pdf-extraction-result" hidden>
             <dl class="pdf-file-info"><div><dt>ファイル</dt><dd id="pdf-file-name"></dd></div><div><dt>ページ数</dt><dd id="pdf-page-count"></dd></div></dl>
-            <label for="pdf-extracted-text">抽出結果</label>
-            <textarea id="pdf-extracted-text" rows="16" readonly spellcheck="false"></textarea>
+            <details id="pdf-analysis-details" class="pdf-analysis-details">
+              <summary>PDF解析の詳細を表示</summary>
+              <div class="pdf-analysis-content">
+                <h3><label for="pdf-extracted-text">PDF全文抽出結果</label></h3>
+                <textarea id="pdf-extracted-text" rows="16" readonly spellcheck="false"></textarea>
+                <h3>解析情報</h3>
+                <pre id="pdf-calendar-debug"></pre>
+              </div>
+            </details>
             <section id="pdf-calendar-result" class="pdf-calendar-result" aria-labelledby="pdf-calendar-heading" hidden>
               <div class="pdf-calendar-heading"><div><h3 id="pdf-calendar-heading">日付別抽出結果</h3><p id="pdf-calendar-message"></p></div><label>表示月 <select id="pdf-calendar-month"></select></label></div>
               <div class="pdf-calendar-table-wrap"><table><thead><tr><th>日付</th><th>抽出内容</th></tr></thead><tbody id="pdf-calendar-body"></tbody></table></div>
-              <details><summary>解析情報を表示</summary><pre id="pdf-calendar-debug"></pre></details>
             </section>
             <section id="annual-event-candidates" class="pdf-calendar-result annual-event-candidates" aria-labelledby="candidate-heading" hidden>
               <div class="pdf-calendar-heading">

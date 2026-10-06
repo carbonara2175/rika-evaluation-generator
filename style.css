@@ -165,7 +165,13 @@ tfoot th, tfoot td { border-bottom: 0; }
 .pdf-file-info div { min-width: 0; }
 .pdf-file-info dt { color: var(--muted); font-size: .72rem; font-weight: 700; }
 .pdf-file-info dd { margin: 0; color: var(--navy); overflow-wrap: anywhere; font-weight: 700; }
-.pdf-extraction-result > label { display: block; margin-bottom: 7px; color: var(--navy); font-size: .88rem; font-weight: 700; }
+.pdf-analysis-details { color: var(--muted); font-size: .82rem; }
+.pdf-analysis-details > summary { width: fit-content; max-width: 100%; cursor: pointer; }
+.pdf-analysis-details > summary:focus-visible { outline: 3px solid rgba(38, 113, 166, .28); outline-offset: 3px; }
+.pdf-analysis-content { min-width: 0; margin-top: 12px; }
+.pdf-analysis-content h3 { margin: 16px 0 7px; color: var(--navy); font-size: .88rem; }
+.pdf-analysis-content pre { max-height: 260px; padding: 12px; overflow: auto; background: #f7f9fb; white-space: pre-wrap; overflow-wrap: anywhere; }
+.pdf-file-info { flex-wrap: wrap; }
 .pdf-extraction-result textarea { max-height: 480px; min-height: 280px; white-space: pre; overflow: auto; resize: vertical; font-family: "BIZ UDPGothic", "Yu Gothic", Meiryo, sans-serif; font-size: .86rem; }
 .pdf-calendar-result { margin-top: 24px; }
 .annual-event-candidates .candidate-review { color: #855b13; background: #fff8e6; font-weight: 700; white-space: nowrap; }

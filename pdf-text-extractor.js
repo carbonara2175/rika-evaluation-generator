@@ -309,6 +309,7 @@ function initializePdfImport() {
   const monthSelect = document.querySelector("#pdf-calendar-month");
   const calendarBody = document.querySelector("#pdf-calendar-body");
   const debugOutput = document.querySelector("#pdf-calendar-debug");
+  const analysisDetails = document.querySelector("#pdf-analysis-details");
   let requestId = 0;
 
   const clear = () => {
@@ -320,6 +321,8 @@ function initializePdfImport() {
     fileName.textContent = "";
     pageCount.textContent = "";
     output.value = "";
+    analysisDetails.open = false;
+    debugOutput.textContent = "";
     calendarPanel.hidden = true;
     status.textContent = "PDFを選択してください。";
     status.className = "pdf-import-status";
@@ -330,6 +333,7 @@ function initializePdfImport() {
     const file = input.files?.[0];
     if (!file) return;
     const currentRequest = ++requestId;
+    analysisDetails.open = false;
     resultPanel.hidden = true;
     clearButton.hidden = false;
     status.className = "pdf-import-status";
@@ -355,14 +359,14 @@ function initializePdfImport() {
       const fiscalYear = Number(document.querySelector("#events-year")?.value) || new Date().getFullYear();
       const restored = result.pages.map((page) => restoreAnnualCalendar(page, fiscalYear));
       const successful = restored.filter((page) => page.ok);
-      calendarPanel.hidden = false;
+      calendarPanel.hidden = !successful.length;
       if (!successful.length) {
         calendarMessage.textContent = restored.map((page, index) => `${index + 1}ページ: ${page.error}`).join(" / ");
         monthSelect.hidden = true;
         calendarBody.replaceChildren();
       } else {
         const cells = successful.flatMap((page) => page.cells);
-        calendarMessage.textContent = `12か月・31日の日付行を認識しました（内容のあるセル: ${cells.length}件）。確認用のため年間行事には登録されません。`;
+        calendarMessage.textContent = "抽出内容を確認し、年間行事候補へ進んでください。登録するまで年間行事には保存されません。";
         monthSelect.hidden = false;
         monthSelect.replaceChildren(new Option("すべて", "all"),
           ...FISCAL_MONTHS.map((month) => new Option(`${month}月`, String(month))));
@@ -384,23 +388,33 @@ function initializePdfImport() {
         const months = page.monthHeaders.map((header) => `${header.month}月 x=${header.x.toFixed(1)}`).join(", ");
         const days = page.dayRows.map((row) => `${row.day}日 y=${row.y.toFixed(1)}`).join(", ");
         return `${index + 1}ページ\n取得したtext item数: ${page.debug.itemCount}`
-          + `\n月ヘッダー候補として検出した文字列: ${page.debug.monthHeaderCandidates.join(" | ") || "なし"}`
+          + `\n\n■ 月認識情報\n月ヘッダー候補として検出した文字列: ${page.debug.monthHeaderCandidates.join(" | ") || "なし"}`
           + `\n月ヘッダー行: ${page.debug.monthHeaderLine || "認識なし"}`
-          + `\n日付行候補として検出した先頭文字列: ${page.debug.dayRowCandidates.join(" | ") || "なし"}`
-          + `\n認識月数: ${page.monthHeaders.length}\n認識日付行数: ${page.dayRows.length}`
+          + `\n認識月数: ${page.monthHeaders.length}`
+          + `\n\n■ 日付行認識情報\n日付行候補として検出した先頭文字列: ${page.debug.dayRowCandidates.join(" | ") || "なし"}`
+          + `\n認識日付行数: ${page.dayRows.length}`
           + `\n直接認識日付行数: ${page.debug.recognizedDayRowCount ?? 0}`
-          + `\n補完日付行数: ${page.debug.interpolatedDayRows?.length ?? 0}`
+          + `\n\n■ 補完情報\n補完日付行数: ${page.debug.interpolatedDayRows?.length ?? 0}`
           + `\n補完日付行: ${page.debug.interpolatedDayRows?.map((row) => `${row.day}日 y=${row.y.toFixed(1)}`).join(", ") || "なし"}`
-          + `\n各月中心x:\n${months ? page.monthHeaders.map((header) => `${header.month}月 x=${header.x.toFixed(1)}`).join("\n") : "認識なし"}`
+          + `\n\n■ 座標情報\n各月中心x:\n${months ? page.monthHeaders.map((header) => `${header.month}月 x=${header.x.toFixed(1)}`).join("\n") : "認識なし"}`
           + `\n日付行: ${days || "認識なし"}`;
       }).join("\n\n");
       resultPanel.hidden = false;
-      if (result.combinedText.replace(/\s/g, "").length < 5) {
+      const recognitionErrors = restored.filter((page) => !page.ok)
+        .map((page) => `${restored.indexOf(page) + 1}ページ: ${page.error}`).join(" / ");
+      if (!successful.length) {
+        status.textContent = recognitionErrors;
+        if (result.combinedText.replace(/\s/g, "").length < 5) {
+          status.textContent += "。このPDFから文字情報を抽出できませんでした。スキャン画像形式のPDFである可能性があります。";
+        }
+        status.classList.add("error");
+      } else if (result.combinedText.replace(/\s/g, "").length < 5) {
         status.textContent = "このPDFから文字情報を抽出できませんでした。スキャン画像形式のPDFである可能性があります。";
         status.classList.add("warning");
       } else {
-        status.textContent = "PDFから文字情報を抽出しました。";
-        status.classList.add("success");
+        status.textContent = `12か月・31日を認識しました。内容のあるセル：${successful.reduce((count, page) => count + page.cells.length, 0)}件`;
+        if (recognitionErrors) status.textContent += `。${recognitionErrors}`;
+        status.classList.add(recognitionErrors ? "warning" : "success");
       }
     } catch (error) {
       if (currentRequest !== requestId) return;
