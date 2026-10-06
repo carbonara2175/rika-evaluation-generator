@@ -1152,9 +1152,12 @@ function loadAnnualEvents() {
 function saveAnnualEvents(events) {
   try {
     localStorage.setItem(annualEventsStorageKey(eventsSchool.value, selectedEventsYear()), JSON.stringify(sortAnnualEvents(events)));
+  } catch { return false; }
+  try {
     localStorage.setItem(EVENTS_SELECTION_KEY, JSON.stringify({ schoolId: eventsSchool.value, year: selectedEventsYear() }));
-  } catch { /* Storage may be disabled by the browser. */ }
+  } catch { /* Event data is saved even if the selection preference cannot be saved. */ }
   renderAnnual();
+  return true;
 }
 
 function scheduleStorageKey() {
@@ -1259,6 +1262,7 @@ function renderAnnualEvents() {
   eventsEmpty.hidden = events.length > 0;
   document.querySelector("#events-list-description").textContent = `${SCHOOLS[eventsSchool.value].name}・${year}年度（${events.length}件）を日付順に表示しています。`;
   renderScheduleProjection();
+  document.dispatchEvent(new Event("annual-events-changed"));
 }
 
 function changeEventsContext() {
