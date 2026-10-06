@@ -180,6 +180,10 @@ tfoot th, tfoot td { border-bottom: 0; }
 .pdf-calendar-table-wrap tbody th { width: 9em; color: var(--navy); }
 .pdf-calendar-result details { margin-top: 12px; color: var(--muted); font-size: .82rem; }
 .pdf-calendar-result pre { max-height: 260px; padding: 12px; overflow: auto; background: #f7f9fb; white-space: pre-wrap; }
+.candidate-filters { display: flex; flex-wrap: wrap; gap: 12px; }
+.candidate-note { margin: 12px 0 0; color: var(--muted); font-size: .82rem; line-height: 1.7; }
+.annual-event-candidates table { min-width: 760px; }
+.annual-event-candidates .pdf-calendar-heading { flex-wrap: wrap; align-items: center; }
 .visually-hidden { position: absolute !important; width: 1px !important; height: 1px !important; padding: 0 !important; overflow: hidden !important; clip: rect(0, 0, 0, 0) !important; white-space: nowrap !important; border: 0 !important; }
 .schedule-subject-row { display: grid; grid-template-columns: minmax(220px, 360px) auto; align-items: end; gap: 20px; margin-top: 20px; }
 .weekly-hours { display: flex; min-height: 48px; padding: 7px 16px; align-items: baseline; gap: 10px; color: var(--navy); background: var(--blue-soft); border: 1px solid #c9d9e4; border-radius: 6px; }
