@@ -5,15 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="学習指導要領の項目から、物理基礎・物理の3観点の評価規準を作成します。">
     <title>理科 評価規準ジェネレーター</title>
-    <link rel="stylesheet" href="style.css?v=1.11.0">
+    <link rel="stylesheet" href="style.css?v=1.12.0">
     <script src="https://cdn.jsdelivr.net/npm/pizzip@3.2.0/dist/pizzip.min.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/docxtemplater@3.62.0/build/docxtemplater.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js" defer></script>
     <script src="annual-hours.js?v=1.8.0" defer></script>
     <script src="annual-events.js?v=1.1.0" defer></script>
     <script src="pdf-text-extractor.js?v=1.2.0" defer></script>
-    <script src="annual-event-candidates-ui.js?v=1.0.0" defer></script>
     <script src="national-holidays.js?v=1.0.0" defer></script>
+    <script src="annual-event-candidate-periods.js?v=1.0.0" defer></script>
+    <script src="annual-event-candidates-ui.js?v=1.1.0" defer></script>
     <script src="regular-schedule.js?v=1.2.0" defer></script>
     <script src="script.js?v=1.10.0" defer></script>
   </head>
@@ -251,9 +252,9 @@
                   <label for="candidate-category">区分 <select id="candidate-category"></select></label>
                 </div>
               </div>
-              <p class="candidate-note">確認用の候補です。年間行事には登録・保存されません。学校行事などの通常授業可否は、学年・科目に応じて確認してください。期間の終了日は推定していません。</p>
+              <p class="candidate-note">確認用の候補です。年間行事には登録・保存されません。連続する同一行事を期間にまとめ、原文の終了日表記から推定します。「要確認」の理由を確認してください。表示月は期間に含まれる月で絞り込みます。</p>
               <div class="pdf-calendar-table-wrap">
-                <table><thead><tr><th scope="col">日付</th><th scope="col">抽出した行事名</th><th scope="col">区分候補</th><th scope="col">通常授業</th><th scope="col">判定理由</th></tr></thead><tbody id="candidate-body"></tbody></table>
+                <table><thead><tr><th scope="col">期間</th><th scope="col">抽出した行事名</th><th scope="col">区分候補</th><th scope="col">通常授業</th><th scope="col">要確認</th><th scope="col">判定理由</th></tr></thead><tbody id="candidate-body"></tbody></table>
               </div>
             </section>
           </div>
