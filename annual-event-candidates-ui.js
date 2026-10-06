@@ -17,6 +17,7 @@ function initializeAnnualEventCandidates() {
   const message = document.querySelector("#candidate-message");
   const body = document.querySelector("#candidate-body");
   let candidates = [];
+  let extractedCount = 0;
 
   monthSelect.replaceChildren(new Option("すべて", "all"),
     ...[4, 5, 6, 7, 8, 9, 10, 11, 12, 1, 2, 3].map((month) => new Option(`${month}月`, String(month))));
@@ -26,27 +27,32 @@ function initializeAnnualEventCandidates() {
 
   const render = () => {
     const visible = candidates.filter((candidate) =>
-      (monthSelect.value === "all" || Number(candidate.date.slice(5, 7)) === Number(monthSelect.value))
+      (monthSelect.value === "all" || candidatePeriodIncludesMonth(candidate, monthSelect.value))
       && (categorySelect.value === "all" || candidate.suggestedCategory === categorySelect.value));
-    message.textContent = `候補 ${candidates.length}件（表示 ${visible.length}件）。`;
+    message.textContent = `統合前 ${extractedCount}件 → 期間候補 ${candidates.length}件（表示 ${visible.length}件）。`;
     const rows = visible.map((candidate) => {
       const row = document.createElement("tr");
       const date = document.createElement("th");
       date.scope = "row";
-      date.textContent = candidate.date.replaceAll("-", "/");
+      date.textContent = formatCandidatePeriod(candidate);
       row.append(date);
       for (const text of [candidate.title, ANNUAL_EVENT_CATEGORIES[candidate.suggestedCategory],
-        annualEventCandidateClassesLabel(candidate.suggestedRegularClassesAvailable), candidate.reason]) {
+        annualEventCandidateClassesLabel(candidate.suggestedRegularClassesAvailable),
+        candidate.needsReview ? "要確認" : "—",
+        [candidate.reason, candidate.reviewReason,
+          candidate.duplicateWarning && !candidate.reason?.includes("国民の祝日一括追加機能")
+            ? "国民の祝日一括追加機能と重複する可能性があります" : ""].filter(Boolean).join("。 ")]) {
         const cell = document.createElement("td");
         cell.textContent = text;
         row.append(cell);
       }
+      if (candidate.needsReview) row.cells[4].classList.add("candidate-review");
       return row;
     });
     if (!rows.length) {
       const row = document.createElement("tr");
       const cell = document.createElement("td");
-      cell.colSpan = 5;
+      cell.colSpan = 6;
       cell.textContent = candidates.length ? "この条件に一致する候補はありません。" : "授業時数に関係する行事候補は見つかりませんでした。";
       row.append(cell);
       rows.push(row);
@@ -56,6 +62,7 @@ function initializeAnnualEventCandidates() {
 
   const syncCompletedImport = () => {
     candidates = [];
+    extractedCount = 0;
     body.replaceChildren();
     message.textContent = "";
     panel.hidden = true;
@@ -72,7 +79,9 @@ function initializeAnnualEventCandidates() {
     // A restoration failure has no date rows. Hide the candidate section so
     // the existing calendar error remains the relevant feedback.
     if (!cells.length && document.querySelector("#pdf-calendar-month").hidden) return;
-    candidates = inferAnnualEventCandidates(cells);
+    const extracted = inferAnnualEventCandidates(cells);
+    extractedCount = extracted.length;
+    candidates = prepareAnnualEventCandidates(extracted);
     panel.hidden = false;
     render();
   };
