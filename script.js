@@ -673,7 +673,11 @@ function savedPlansInTeachingOrder() {
   const orderedUnits = units.length ? units : [planUnitData()];
   const plans = orderedUnits.map((unit) => {
     try {
-      return JSON.parse(localStorage.getItem(`${PLAN_STORAGE_PREFIX}${planSchool.value}__${planSubject.value}__${unit.id}`));
+      const plan = JSON.parse(localStorage.getItem(`${PLAN_STORAGE_PREFIX}${planSchool.value}__${planSubject.value}__${unit.id}`));
+      if (!plan || typeof plan !== "object" || Array.isArray(plan)) return null;
+      // Older v2 plans omit identity fields. Recover them from the unit whose
+      // storage key was read, without migrating or rewriting the saved data.
+      return { ...plan, unitId: plan.unitId || unit.id, unitName: plan.unitName || unit.unit };
     } catch { return null; }
   }).filter(Boolean);
   return { orderedUnits, plans };
