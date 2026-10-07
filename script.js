@@ -736,8 +736,11 @@ function renderExamRanges() {
   projection.checkpoints.forEach((checkpoint, examIndex) => {
     const automatic = findAutomaticExamRange(lessons, checkpoint.cumulativeHours);
     const saved = loadConfirmedExamRange(year, checkpoint);
-    const confirmed = saved ? lessons.find((lesson) => endpointId(lesson) === saved.endpointId) : null;
+    const confirmed = saved && !saved.needsReview ? lessons.find((lesson) => endpointId(lesson) === saved.endpointId) : null;
     const invalidSaved = Boolean(saved && !confirmed);
+    const savedWarning = saved?.needsReview
+      ? "保存済みの考査範囲は、単元指導計画の変更により再確認が必要です"
+      : invalidSaved ? "保存済みの考査範囲が現在の単元指導計画に存在しません" : "";
     const selected = confirmed || automatic || lessons[0];
     effectiveEndpoints.push(selected);
     const article = document.createElement("article");
@@ -781,7 +784,7 @@ function renderExamRanges() {
     save.type = "button"; save.className = "copy-all-button"; save.textContent = "この範囲を確定・保存";
     const warning = document.createElement("p");
     warning.className = "exam-range-warning";
-    if (invalidSaved) warning.textContent = "保存済みの考査範囲が現在の単元指導計画に存在しません";
+    warning.textContent = savedWarning;
     const updatePreview = () => {
       const endpoint = lessons.find((lesson) => endpointId(lesson) === select.value);
       if (!endpoint) return;
@@ -791,8 +794,8 @@ function renderExamRanges() {
       balance.parentElement.querySelector("dt").textContent = gap >= 0 ? "余裕" : "不足";
       balance.parentElement.className = gap < 0 ? "range-shortage" : "range-margin";
       const previous = examIndex > 0 ? effectiveEndpoints[examIndex - 1] : null;
-      warning.textContent = previous && endpoint.cumulativeHours < previous.cumulativeHours
-        ? "前の考査より範囲終点が前になっています（保存は可能です）" : (invalidSaved ? "保存済みの考査範囲が現在の単元指導計画に存在しません" : "");
+      warning.textContent = [savedWarning, previous && endpoint.cumulativeHours < previous.cumulativeHours
+        ? "前の考査より範囲終点が前になっています（保存は可能です）" : ""].filter(Boolean).join("\n");
     };
     select.addEventListener("change", updatePreview);
     save.addEventListener("click", () => {
@@ -879,13 +882,96 @@ function evaluationMark(value) {
 function renderLessonRows(plan) {
   lessonRows.replaceChildren(...plan.rows.map((lesson) => {
     const row = document.createElement("tr");
-    row.innerHTML = `<th scope="row"><span>${lesson.hour}</span><small>時間目</small></th><td><label><span class="mobile-label">学習活動（学習内容）</span><textarea data-field="activity" rows="3" aria-label="${lesson.hour}時間目の学習活動"></textarea></label></td>${["knowledge", "thinking", "attitude"].map((key) => `<td class="evaluation-cell"><button type="button" class="evaluation-toggle" data-evaluation="${key}" data-value="${lesson.evaluation[key]}" aria-label="${lesson.hour}時間目の${key === "knowledge" ? "知識・技能" : key === "thinking" ? "思考・判断・表現" : "主体的態度"}の評価">${evaluationMark(lesson.evaluation[key])}</button></td>`).join("")}<td><label><span class="mobile-label">評価の観点及び方法</span><textarea data-field="method" rows="3" aria-label="${lesson.hour}時間目の評価の観点及び方法"></textarea></label></td>`;
+    row.innerHTML = `<th scope="row"><span>${lesson.hour}</span><small>時間目</small><button type="button" class="lesson-actions-trigger" aria-label="${lesson.hour}時間目の操作" aria-haspopup="dialog">⋮</button></th><td><label><span class="mobile-label">学習活動（学習内容）</span><textarea data-field="activity" rows="3" aria-label="${lesson.hour}時間目の学習活動"></textarea></label></td>${["knowledge", "thinking", "attitude"].map((key) => `<td class="evaluation-cell"><button type="button" class="evaluation-toggle" data-evaluation="${key}" data-value="${lesson.evaluation[key]}" aria-label="${lesson.hour}時間目の${key === "knowledge" ? "知識・技能" : key === "thinking" ? "思考・判断・表現" : "主体的態度"}の評価">${evaluationMark(lesson.evaluation[key])}</button></td>`).join("")}<td><label><span class="mobile-label">評価の観点及び方法</span><textarea data-field="method" rows="3" aria-label="${lesson.hour}時間目の評価の観点及び方法"></textarea></label></td>`;
     row.querySelector('[data-field="activity"]').value = lesson.activity;
     row.querySelector('[data-field="method"]').value = lesson.method;
     return row;
   }));
   document.querySelector("#hours-progress").textContent = `${plan.rows.length} / ${plan.allocatedHours}時間`;
 }
+
+// Correct every saved year/checkpoint for this school and subject only.
+function adjustExamRangesForLessonEdit(unitId, hour, action) {
+  const prefix = `${EXAM_RANGE_STORAGE_PREFIX}${planSchool.value}:${planSubject.value}:`;
+  const changes = [];
+  for (let index = 0; index < localStorage.length; index += 1) {
+    const key = localStorage.key(index);
+    if (!key?.startsWith(prefix)) continue;
+    const original = localStorage.getItem(key);
+    let saved;
+    try { saved = JSON.parse(original); } catch { continue; }
+    if (!saved || saved.needsReview) continue;
+    // Support older confirmations that only contain endpointId.
+    const separator = saved.endpointId?.lastIndexOf(":");
+    const savedUnit = saved.unitId ?? saved.endpointId?.slice(0, separator);
+    const savedHour = Number(saved.hour ?? saved.endpointId?.slice(separator + 1));
+    if (savedUnit !== unitId || !Number.isInteger(savedHour) || savedHour < 1) continue;
+    const updated = { ...saved };
+    if (action === "delete" && savedHour === hour) {
+      updated.needsReview = true;
+      updated.reviewReason = "考査範囲終点に設定されていた授業時間が削除されました";
+    } else {
+      const shifted = action === "before" ? savedHour >= hour : savedHour > hour;
+      if (!shifted) continue;
+      updated.unitId = unitId;
+      updated.hour = savedHour + (action === "delete" ? -1 : 1);
+      updated.endpointId = endpointId(updated);
+    }
+    changes.push({ key, original, updated });
+  }
+  try {
+    changes.forEach(({ key, updated }) => localStorage.setItem(key, JSON.stringify(updated)));
+  } catch (error) {
+    changes.forEach(({ key, original }) => {
+      try { localStorage.setItem(key, original); } catch { /* Storage unavailable. */ }
+    });
+    throw error;
+  }
+}
+
+function editLessonRow(hour, action) {
+  if (!["before", "after", "delete"].includes(action)) return;
+  if (action === "delete") {
+    if (lessonRows.querySelectorAll("tr").length <= 1) return;
+    if (!window.confirm(`${hour}時間目を削除します。\n入力済みの学習活動・評価設定も削除されます。\nよろしいですか？`)) return;
+  }
+  // Read live fields, including edits that have not emitted an input event.
+  const plan = currentPlan();
+  if (!Number.isInteger(hour) || hour < 1 || hour > plan.rows.length) return;
+  try { adjustExamRangesForLessonEdit(plan.unitId, hour, action); }
+  catch { showToast("考査範囲を保存できないため、授業時間の変更を中止しました"); return; }
+  if (action === "delete") plan.rows.splice(hour - 1, 1);
+  else plan.rows.splice(action === "before" ? hour - 1 : hour, 0, blankLesson(0));
+  plan.rows.forEach((row, index) => { row.hour = index + 1; });
+  plan.allocatedHours = plan.rows.length;
+  allocatedHoursInput.value = plan.allocatedHours;
+  renderLessonRows(plan);
+  savePlan();
+  renderAnnual();
+  lessonRows.querySelectorAll(".lesson-actions-trigger")[Math.min(hour - 1, plan.rows.length - 1)]?.focus();
+}
+
+const lessonActionsDialog = document.createElement("dialog");
+lessonActionsDialog.className = "lesson-actions-dialog";
+lessonActionsDialog.setAttribute("aria-labelledby", "lesson-actions-title");
+lessonActionsDialog.innerHTML = `<h3 id="lesson-actions-title"></h3><button type="button" data-lesson-action="before">この前に1時間追加</button><button type="button" data-lesson-action="after">この後に1時間追加</button><button type="button" data-lesson-action="delete">この時間を削除</button><button type="button" data-lesson-action="cancel">閉じる</button>`;
+document.body.append(lessonActionsDialog);
+lessonActionsDialog.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-lesson-action]");
+  if (!button || button.disabled) return;
+  const hour = Number(lessonActionsDialog.dataset.hour);
+  lessonActionsDialog.close();
+  if (button.dataset.lessonAction !== "cancel") editLessonRow(hour, button.dataset.lessonAction);
+});
+lessonRows.addEventListener("click", (event) => {
+  const trigger = event.target.closest(".lesson-actions-trigger");
+  if (!trigger) return;
+  const hour = [...lessonRows.querySelectorAll("tr")].indexOf(trigger.closest("tr")) + 1;
+  lessonActionsDialog.dataset.hour = hour;
+  lessonActionsDialog.querySelector("h3").textContent = `${hour}時間目の操作`;
+  lessonActionsDialog.querySelector('[data-lesson-action="delete"]').disabled = lessonRows.querySelectorAll("tr").length <= 1;
+  lessonActionsDialog.showModal();
+});
 
 function unitGoals(unit = planUnitData()) {
   return [
