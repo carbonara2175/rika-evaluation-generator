@@ -364,3 +364,67 @@ test("uploaded Goshoko R08 PDF header recognizes twelve numeric columns at their
   });
   assert.equal(result.error, "日付行を正しく認識できませんでした");
 });
+
+test("all weekday tokens including separate Monday labels are recognized without treating contiguous months as days", () => {
+  const page = calendarWithMissingDayLabels([]);
+  const weekdays = ["月", "火", "水", "木", "金", "土", "日"];
+  for (let day = 1; day <= 31; day += 1) {
+    const y = 530 - (day - 1) * 15;
+    page.items.push(positioned(weekdays[(day - 1) % 7], 20, y));
+  }
+  page.items.push(positioned("6月", 5, 590));
+  const result = restoreAnnualCalendar(page, 2026);
+  assert.equal(result.ok, true);
+  assert.equal(result.debug.recognizedDayRowCount, 31);
+  assert.equal(result.dayRows.find(row => row.day === 6).y, 455);
+  assert.deepEqual(result.debug.interpolatedDayRows, []);
+});
+
+test("positioned day column wins over event numbers and summary duplicates, including duplicates at the same x", () => {
+  const page = calendarWithMissingDayLabels([]);
+  for (const day of [1, 2, 3, 14, 17, 18, 21]) {
+    page.items.push(positioned(String(day), 5, 50 - day),
+      positioned(String(day), 300, 45 - day),
+      positioned(`${day}年総探`, 5, 580 - day));
+  }
+  // Body numbers have all 31 values but run upward, unlike a day column.
+  for (let day = 1; day <= 31; day += 1) page.items.push(positioned(String(day), 300, 60 + day * 10));
+  const result = restoreAnnualCalendar(page, 2026);
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.dayRows, Array.from({ length: 31 }, (_, i) => ({ day: i + 1, y: 530 - i * 15 })));
+  assert.equal(result.debug.recognizedDayRowCount, 31);
+  assert.deepEqual(result.debug.interpolatedDayRows, []);
+});
+
+test("a more complete right day column is selected without averaging competing columns", () => {
+  const page = calendarWithMissingDayLabels([6, 13, 20, 27]);
+  for (let day = 1; day <= 31; day += 1) page.items.push(positioned(String(day), 895, 530 - (day - 1) * 15));
+  const result = restoreAnnualCalendar(page, 2026);
+  assert.equal(result.ok, true);
+  assert.equal(result.debug.recognizedDayRowCount, 31);
+  assert.deepEqual(result.debug.interpolatedDayRows, []);
+});
+
+test("Goshoko actual positioned extraction restores 31 direct day rows and 204 populated cells", () => {
+  const page = require("./test-fixtures/goshoko-r08-calendar-items.json");
+  const result = restoreAnnualCalendar(page, 2026);
+  assert.equal(result.ok, true);
+  assert.equal(result.monthHeaders.length, 12);
+  assert.equal(result.debug.recognizedDayRowCount, 31);
+  assert.equal(result.dayRows.length, 31);
+  assert.deepEqual(result.debug.interpolatedDayRows, []);
+  for (const [day, y] of [[6, 643.320053], [13, 499.68003875], [20, 356.04002375], [27, 212.40005525]]) {
+    assert.ok(Math.abs(result.dayRows.find(row => row.day === day).y - y) < 0.000001);
+  }
+  result.dayRows.forEach((row, index) => {
+    if (index) assert.ok(row.y < result.dayRows[index - 1].y);
+  });
+  assert.equal(result.cells.length, 204);
+  assert.ok(result.cells.some(cell => cell.date === "2026-07-20" && cell.text.includes("海の日")));
+  assert.equal(result.cells.some(cell => /う日数|休業日.*休業日|考査日数/.test(cell.text)), false);
+  const { inferAnnualEventCandidates } = require("./annual-events");
+  const candidates = inferAnnualEventCandidates(result.cells);
+  assert.equal(candidates.length, 61);
+  const { prepareAnnualEventCandidates } = require("./annual-event-candidate-periods");
+  assert.equal(prepareAnnualEventCandidates(candidates).length, 56);
+});

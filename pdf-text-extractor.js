@@ -123,24 +123,57 @@ function findMonthHeaderLine(items, pageHeight, numericOnly) {
 }
 
 function leadingDay(text) {
-  const match = String(text ?? "").normalize("NFKC").trim().match(/^([1-9]|[12]\d|3[01])(?!\d)(?!\s*月)/);
+  const match = String(text ?? "").normalize("NFKC").trim().match(/^([1-9]|[12]\d|3[01])(?!\d)(?!月)/);
   return match ? Number(match[1]) : null;
 }
 
-function findDayRows(items) {
-  const candidates = clusterTextLines(items).map((line) => {
-    const first = line.items[0];
-    const leadingText = line.items.map((item) => item.text).join(" ");
-    const day = leadingDay(leadingText);
-    return day ? { day, y: median(line.items.map((item) => item.y)), sources: [first],
-      leadingText } : null;
-  }).filter(Boolean);
-  return Array.from({ length: 31 }, (_, index) => {
-    const day = index + 1;
-    const matches = candidates.filter((item) => item.day === day);
-    return matches.length ? { day, y: median(matches.map((item) => item.y)),
-      sources: matches.flatMap((item) => item.sources), leadingText: matches[0].leadingText } : null;
-  }).filter(Boolean);
+function findDayRows(items, monthHeaders = []) {
+  const headerY = monthHeaders.length ? median(monthHeaders.map((header) => header.y)) : Infinity;
+  // Day labels occupy their own positioned token. Event prefixes such as
+  // 1年総探 and contiguous month labels are not day labels.
+  const candidates = items.flatMap((item) => {
+    const token = normalizeCalendarToken(item.text);
+    const match = token.match(/^([1-9]|[12]\d|3[01])(?:日)?$/);
+    if (!match || item.y >= headerY) return [];
+    return [{ day: Number(match[1]), x: centerX(item), y: item.y,
+      sources: [item], leadingText: item.text, height: item.height }];
+  });
+  const columns = [];
+  candidates.sort((a, b) => a.x - b.x).forEach((candidate) => {
+    const column = columns.find((group) => Math.abs(candidate.x - group.x)
+      <= Math.max(2, Math.min(candidate.height, group.height) * 0.6));
+    if (column) column.rows.push(candidate);
+    else columns.push({ x: candidate.x, height: candidate.height, rows: [candidate] });
+  });
+  let best = [];
+  let bestX = Infinity;
+  let bestScore = 0;
+  columns.forEach((column) => {
+    const rows = column.rows.sort((a, b) => a.day - b.day || b.y - a.y);
+    const distinctDays = new Set(rows.map((row) => row.day));
+    // Choose actual anchors in a descending sequence instead of averaging
+    // repeated day numbers with summary values elsewhere on the page.
+    const sequences = [];
+    rows.forEach((row, index) => {
+      let prefix = [];
+      for (let previous = 0; previous < index; previous += 1) {
+        if (rows[previous].day < row.day && rows[previous].y > row.y
+          && sequences[previous].length > prefix.length) prefix = sequences[previous];
+      }
+      sequences.push([...prefix, row]);
+    });
+    let selected = sequences.reduce((longest, sequence) => sequence.length > longest.length ? sequence : longest, []);
+    const score = selected.length;
+    if (distinctDays.size === rows.length) selected = rows;
+    // Preserve conflicting unique anchors so interpolation's existing safety
+    // guard rejects them instead of hiding the conflict with guessed rows.
+    if (score > bestScore || (score === bestScore && column.x < bestX)) {
+      best = selected;
+      bestX = column.x;
+      bestScore = score;
+    }
+  });
+  return best.map(({ day, y, sources, leadingText }) => ({ day, y, sources, leadingText }));
 }
 
 /** Fill internal day-label gaps using the nearest recognized rows on both sides. */
@@ -219,7 +252,8 @@ function restoreAnnualCalendar(page, fiscalYear) {
   debug.monthHeaderLine = recognizedHeader.text;
   debug.monthHeaderCandidates = recognizedHeader.text ? [recognizedHeader.text] : [];
   if (monthHeaders.length !== 12) return { ok: false, error: "月列を正しく認識できませんでした", monthHeaders, dayRows: [], cells: [], debug };
-  const recognizedDayRows = findDayRows(items);
+  const recognizedDayRows = findDayRows(items, monthHeaders);
+  debug.dayRowCandidates = recognizedDayRows.map((row) => row.leadingText);
   const dayRows = interpolateDayRows(recognizedDayRows);
   debug.recognizedDayRowCount = recognizedDayRows.length;
   debug.interpolatedDayRows = dayRows.filter((row) => row.interpolated).map(({ day, y }) => ({ day, y }));
