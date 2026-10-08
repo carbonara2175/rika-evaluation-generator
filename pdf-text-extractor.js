@@ -76,10 +76,23 @@ function positionedLineText(line) {
 }
 
 function findMonthHeaders(items, pageHeight) {
+  const labeled = findMonthHeaderLine(items, pageHeight, false);
+  if (labeled.headers.length === 12) return labeled;
+  return findMonthHeaderLine(items, pageHeight, true);
+}
+
+function findMonthHeaderLine(items, pageHeight, numericOnly) {
   const headerPattern = FISCAL_MONTHS.map((month) => `(${month}\\s*月)`).join("\\s*");
-  const expression = new RegExp(headerPattern);
+  // Numeric fallback accepts only a complete header, optionally flanked by 日.
+  // Requiring whitespace keeps adjacent digits (e.g. 45) from becoming months.
+  const numericPattern = FISCAL_MONTHS.map((month) => `(${month})`).join("\\s+");
+  const expression = new RegExp(numericOnly ? `^\\s*(?:日\\s*)?${numericPattern}\\s*(?:日)?\\s*$` : headerPattern);
+  const height = Number(pageHeight) || items.reduce((top, item) => Math.max(top, item.y + item.height), 0);
   let best = null;
   clusterTextLines(items, Math.max(0.55, (Number(pageHeight) || 0) / 5000)).forEach((line) => {
+    // PDF y coordinates increase toward the top. Summary rows below the
+    // calendar must never supply a numeric header, even with the same numbers.
+    if (numericOnly && line.y < height / 2) return;
     const positionedLine = positionedLineText(line);
     const normalizedText = positionedLine.text.normalize("NFKC");
     const match = expression.exec(normalizedText);
@@ -101,7 +114,9 @@ function findMonthHeaders(items, pageHeight) {
         source: sourceRanges.length === 1 ? sourceRanges[0].item : null,
         sources: sourceRanges.map((range) => range.item) };
     });
-    const candidate = { headers, text: FISCAL_MONTHS.map((month) => `${month}月`).join(" ") };
+    if (numericOnly && headers.some((header, index) => !Number.isFinite(header.x)
+      || !header.sources.length || (index > 0 && header.x <= headers[index - 1].x))) return;
+    const candidate = { headers, text: FISCAL_MONTHS.map((month) => numericOnly ? String(month) : `${month}月`).join(" ") };
     if (!best || median(headers.map((header) => header.y)) > median(best.headers.map((header) => header.y))) best = candidate;
   });
   return best || { headers: [], text: "" };

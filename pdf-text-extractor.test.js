@@ -266,3 +266,85 @@ test("calendar restoration fails safely when headers or rows are incomplete", ()
   assert.equal(result.ok, false);
   assert.equal(result.error, "日付行を正しく認識できませんでした");
 });
+
+const fiscalMonths = [4, 5, 6, 7, 8, 9, 10, 11, 12, 1, 2, 3];
+const numericMonthLine = fiscalMonths.join(" ");
+function numericCalendar() {
+  const page = calendarWithMissingDayLabels([]);
+  page.items.splice(0, 12, positioned("日", 5, 560),
+    ...fiscalMonths.map((month, index) => positioned(String(month), 55 + index * 70, 560, 18)),
+    positioned("日", 895, 560));
+  return page;
+}
+
+test("numeric fiscal headers ignore flanking 日 and preserve all columns, rows and valid cells", () => {
+  const result = restoreAnnualCalendar(numericCalendar(), 2026);
+  const labeled = restoreAnnualCalendar(calendarWithMissingDayLabels([]), 2026);
+  assert.equal(result.ok, true);
+  assert.equal(result.monthHeaders.length, 12);
+  assert.deepEqual(result.monthHeaders, labeled.monthHeaders);
+  assert.deepEqual(result.monthBoundaries, labeled.monthBoundaries);
+  assert.deepEqual(result.dayRows, labeled.dayRows);
+  assert.equal(result.debug.recognizedDayRowCount, 31);
+  assert.equal(result.cells.length, 365);
+  assert.deepEqual(result.cells.map(({ date, text }) => [date, text]),
+    labeled.cells.map(({ date, text }) => [date, text]));
+  assert.equal(result.debug.monthHeaderLine, numericMonthLine);
+  assert.deepEqual(result.debug.monthHeaderCandidates, [numericMonthLine]);
+  result.monthHeaders.forEach((header, index) => {
+    assert.equal(header.month, fiscalMonths[index]);
+    assert.equal(header.x, 64 + index * 70);
+    if (index) assert.ok(header.x > result.monthHeaders[index - 1].x);
+  });
+});
+
+test("combined numeric headers recover each character center with and without 日", () => {
+  for (const text of [numericMonthLine, `日 ${numericMonthLine} 日`, `日 ${numericMonthLine} 日`.replace(/\d/g, d => String.fromCharCode(d.charCodeAt(0) + 0xfee0))]) {
+    const page = calendarWithMissingDayLabels([]);
+    page.items.splice(0, 12, positioned(text, 50, 560, text.length * 7));
+    const result = restoreAnnualCalendar(page, 2026);
+    assert.equal(result.ok, true);
+    let from = 0;
+    const normalized = text.normalize("NFKC");
+    result.monthHeaders.forEach((header, index) => {
+      const label = String(fiscalMonths[index]);
+      const start = normalized.indexOf(label, from);
+      from = start + label.length;
+      assert.equal(header.x, 50 + (start + label.length / 2) * 7);
+      if (index) assert.ok(header.x > result.monthHeaders[index - 1].x);
+    });
+    assert.equal(result.cells.some(cell => cell.text === numericMonthLine), false);
+  }
+});
+
+test("labeled headers take precedence even when numeric headers are higher", () => {
+  const page = calendarWithMissingDayLabels([]);
+  page.items.push(positioned(`日 ${numericMonthLine} 日`, 10, 585, 880));
+  const result = restoreAnnualCalendar(page, 2026);
+  assert.equal(result.debug.monthHeaderLine, fiscalMonths.map(month => `${month}月`).join(" "));
+  assert.deepEqual(result.monthHeaders, restoreAnnualCalendar(calendarWithMissingDayLabels([]), 2026).monthHeaders);
+});
+
+test("incomplete, reordered, extra, adjacent, nonmonotonic and multiline numeric sequences are rejected", () => {
+  for (const text of ["4 5 6 7 8 9 10 11 12 1 2", "5 4 6 7 8 9 10 11 12 1 2 3",
+    `0 ${numericMonthLine}`, `${numericMonthLine} 4`, numericMonthLine.replace("4 5", "45"), `集計 ${numericMonthLine}`]) {
+    const result = restoreAnnualCalendar({ height: 600, items: [positioned(text, 50, 560, 840)] }, 2026);
+    assert.equal(result.monthHeaders.length, 0, text);
+  }
+  const collapsed = restoreAnnualCalendar({ height: 600, items: [positioned(numericMonthLine, 50, 560, 0)] }, 2026);
+  assert.equal(collapsed.monthHeaders.length, 0);
+  const split = fiscalMonths.map((month, index) => positioned(String(month), 55 + index * 70, index < 6 ? 560 : 540));
+  assert.equal(restoreAnnualCalendar({ height: 600, items: split }, 2026).monthHeaders.length, 0);
+});
+
+test("bottom summary numbers cannot supply a numeric month header; topmost valid candidate wins", () => {
+  for (const height of [600, 0]) {
+    const items = [positioned("年間行事", 50, 590, 60), positioned(numericMonthLine, 50, 50, 840)];
+    assert.equal(restoreAnnualCalendar({ height, items }, 2026).monthHeaders.length, 0);
+  }
+  const page = numericCalendar();
+  page.items.push(positioned(numericMonthLine, 50, 550, 840), positioned(numericMonthLine, 50, 50, 840));
+  const result = restoreAnnualCalendar(page, 2026);
+  assert.equal(result.ok, true);
+  assert.ok(result.monthHeaders.every(header => header.y === 560));
+});
