@@ -348,3 +348,19 @@ test("bottom summary numbers cannot supply a numeric month header; topmost valid
   assert.equal(result.ok, true);
   assert.ok(result.monthHeaders.every(header => header.y === 560));
 });
+
+test("uploaded Goshoko R08 PDF header recognizes twelve numeric columns at their actual centers", () => {
+  const page = require("./test-fixtures/goshoko-r08-month-header.json");
+  const result = restoreAnnualCalendar(page, 2026);
+  assert.equal(result.monthHeaders.length, 12);
+  assert.deepEqual(result.monthHeaders.map(header => header.month), fiscalMonths);
+  assert.equal(result.debug.monthHeaderLine, numericMonthLine);
+  const expected = [148.43979825, 233.71116975, 319.112133, 404.3835045,
+    489.654876, 575.05583925, 660.32721075, 745.728174, 830.9995455,
+    916.270917, 1001.67188025, 1086.94325175];
+  result.monthHeaders.forEach((header, index) => {
+    assert.ok(Math.abs(header.x - expected[index]) < 0.000001);
+    if (index) assert.ok(header.x > result.monthHeaders[index - 1].x);
+  });
+  assert.equal(result.error, "日付行を正しく認識できませんでした");
+});
