@@ -1,5 +1,8 @@
 "use strict";
 
+const normalizeMonthlyTeachingPeriod = typeof module !== "undefined"
+  ? require("./teaching-period.js").normalizeTeachingPeriod : normalizeTeachingPeriod;
+
 const ANNUAL_EVENT_CATEGORIES = {
   school_event: "学校行事",
   exam: "考査",
@@ -150,14 +153,15 @@ function formatEventDateRange(startDate, endDate = startDate) {
 }
 
 // Use UTC dates so the count is not affected by the browser's locale or DST.
-function calculateMonthlyAvailableSchoolDays(year, events) {
+function calculateMonthlyAvailableSchoolDays(year, events, teachingPeriod) {
   const schoolYear = Math.trunc(Number(year));
   const months = Array.from({ length: 12 }, (_, index) => index < 9
     ? { year: schoolYear, month: index + 3 }
     : { year: schoolYear + 1, month: index - 9 });
   const excludedDates = new Set();
-  const rangeStart = Date.UTC(schoolYear, 3, 1);
-  const rangeEnd = Date.UTC(schoolYear + 1, 2, 31);
+  const period = normalizeMonthlyTeachingPeriod(schoolYear, teachingPeriod);
+  const rangeStart = Date.parse(`${period.startDate}T00:00:00Z`);
+  const rangeEnd = Date.parse(`${period.endDate}T00:00:00Z`);
 
   (Array.isArray(events) ? events : []).map(normalizeAnnualEvent)
     .filter((event) => !event.regularClassesAvailable)
@@ -179,7 +183,7 @@ function calculateMonthlyAvailableSchoolDays(year, events) {
     for (let dayOfMonth = 1; dayOfMonth <= daysInMonth; dayOfMonth += 1) {
       const date = new Date(Date.UTC(calendarYear, month, dayOfMonth));
       const weekday = date.getUTCDay();
-      if (weekday < 1 || weekday > 5) continue;
+      if (weekday < 1 || weekday > 5 || date.getTime() < rangeStart || date.getTime() > rangeEnd) continue;
       weekdays += 1;
       if (excludedDates.has(date.toISOString().slice(0, 10))) excluded += 1;
     }

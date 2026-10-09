@@ -394,3 +394,8 @@ textarea:focus-visible { outline: 3px solid rgba(38, 113, 166, .28); outline-off
 .lesson-actions-dialog button { display: block; width: 100%; margin-top: 8px; padding: 10px; border: 1px solid var(--line); border-radius: 5px; background: #fff; color: var(--navy); font: inherit; cursor: pointer; }
 .lesson-actions-dialog button:disabled { color: var(--muted); background: #eef1f3; cursor: not-allowed; }
 .lesson-actions-dialog button[data-lesson-action="delete"]:not(:disabled) { color: #a22; }
+
+.teaching-period-settings { margin: 1rem 0; padding: 1rem; border: 1px solid var(--border, #dce3e8); border-radius: 8px; }
+.teaching-period-settings h3 { margin: 0 0 .5rem; }
+.teaching-period-settings p { font-size: .875rem; }
+.teaching-period-settings .schedule-add-row { flex-wrap: wrap; }

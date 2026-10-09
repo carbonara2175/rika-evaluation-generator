@@ -304,7 +304,7 @@ function annualEventProjection() {
     events = Array.isArray(savedEvents) ? sortAnnualEvents(savedEvents) : [];
   } catch { /* Invalid or unavailable storage is treated as missing data. */ }
   return {
-    ...calculateScheduleProjection(year, slots, events),
+    ...calculateScheduleProjection(year, slots, events, loadTeachingPeriod(localStorage, schoolId, year, courseId)),
     hasRegularSchedule: slots.length > 0,
     hasAnnualEvents: events.length > 0
   };
@@ -320,7 +320,7 @@ function annualExamProjection() {
     const savedEvents = JSON.parse(localStorage.getItem(annualEventsStorageKey(schoolId, year)));
     events = Array.isArray(savedEvents) ? sortAnnualEvents(savedEvents) : [];
   } catch { /* Invalid or unavailable storage is treated as missing data. */ }
-  return { hasRegularSchedule: slots.length > 0, checkpoints: calculateExamCheckpoints(year, slots, events) };
+  return { hasRegularSchedule: slots.length > 0, checkpoints: calculateExamCheckpoints(year, slots, events, loadTeachingPeriod(localStorage, schoolId, year, courseId)) };
 }
 
 function renderExamCheckpoints() {
@@ -355,15 +355,18 @@ function renderExamCheckpoints() {
 }
 
 function annualEventAvailableDays() {
-  const { schoolId } = annualIds();
+  const { schoolId, courseId } = annualIds();
   const year = selectedAnnualEventsReferenceYear();
   let events = [];
   try {
     const saved = JSON.parse(localStorage.getItem(annualEventsStorageKey(schoolId, year)));
     events = Array.isArray(saved) ? sortAnnualEvents(saved) : [];
   } catch { /* Invalid or unavailable storage is treated as missing data. */ }
-  return events.length
-    ? { ...calculateMonthlyAvailableSchoolDays(year, events), automatic: true }
+  const period = loadTeachingPeriod(localStorage, schoolId, year, courseId);
+  const bounds = defaultTeachingPeriod(year);
+  const customPeriod = period.startDate !== bounds.startDate || period.endDate !== bounds.endDate;
+  return events.length || customPeriod
+    ? { ...calculateMonthlyAvailableSchoolDays(year, events, period), automatic: true }
     : { days: [...annualManualDays], details: [], automatic: false };
 }
 
@@ -445,7 +448,7 @@ function renderAnnual() {
   document.querySelector("#difference-card").classList.toggle("shortage", rawDifference < 0);
   document.querySelector("#summary-allocation").textContent = `${allocated} / ${annualHours}時間`;
   document.querySelector("#monthly-days-source").textContent = availableDays.automatic
-    ? `${selectedAnnualEventsReferenceYear()}年度の年間行事から自動算出`
+    ? `${selectedAnnualEventsReferenceYear()}年度の年間行事・授業対象期間から自動算出`
     : "年間行事データ未設定のため手入力値を使用";
   [...monthInputs.querySelectorAll("input")].forEach((input, index) => {
     input.value = effectiveDays[index];
@@ -701,7 +704,7 @@ function planExamProjection(year) {
     const saved = JSON.parse(localStorage.getItem(annualEventsStorageKey(planSchool.value, year)));
     events = Array.isArray(saved) ? sortAnnualEvents(saved) : [];
   } catch { /* Missing settings are reported by the range UI. */ }
-  return { hasRegularSchedule: slots.length > 0, checkpoints: calculateExamCheckpoints(year, slots, events) };
+  return { hasRegularSchedule: slots.length > 0, checkpoints: calculateExamCheckpoints(year, slots, events, loadTeachingPeriod(localStorage, planSchool.value, year, planSubject.value)) };
 }
 
 function loadConfirmedExamRange(year, checkpoint) {
@@ -1250,6 +1253,46 @@ function saveAnnualEvents(events) {
   return true;
 }
 
+function renderTeachingPeriod() {
+  const year = selectedEventsYear();
+  const bounds = defaultTeachingPeriod(year);
+  const period = loadTeachingPeriod(localStorage, eventsSchool.value, year, scheduleSubject.value);
+  for (const [id, value] of [["start", period.startDate], ["end", period.endDate]]) {
+    const input = document.querySelector(`#teaching-period-${id}`);
+    input.min = bounds.startDate;
+    input.max = bounds.endDate;
+    input.value = value;
+  }
+  document.querySelector("#teaching-period-message").textContent = "";
+}
+
+function persistTeachingPeriod(period) {
+  const year = selectedEventsYear();
+  const message = document.querySelector("#teaching-period-message");
+  const error = teachingPeriodValidationError(year, period);
+  if (error) { message.textContent = error; return; }
+  if (!saveTeachingPeriod(localStorage, eventsSchool.value, year, scheduleSubject.value, period)) {
+    message.textContent = "授業対象期間を保存できませんでした。";
+    return;
+  }
+  renderTeachingPeriod();
+  renderScheduleProjection();
+  renderAnnual();
+  renderExamRanges();
+  message.textContent = "授業対象期間を保存しました。";
+}
+
+document.querySelector("#teaching-period-form").addEventListener("submit", (event) => {
+  event.preventDefault();
+  persistTeachingPeriod({
+    startDate: document.querySelector("#teaching-period-start").value,
+    endDate: document.querySelector("#teaching-period-end").value
+  });
+});
+document.querySelector("#teaching-period-reset").addEventListener("click", () => {
+  persistTeachingPeriod(defaultTeachingPeriod(selectedEventsYear()));
+});
+
 function scheduleStorageKey() {
   return regularScheduleStorageKey(eventsSchool.value, selectedEventsYear(), scheduleSubject.value);
 }
@@ -1266,6 +1309,7 @@ function saveRegularSchedule(slots) {
 }
 
 function renderRegularSchedule() {
+  renderTeachingPeriod();
   const slots = loadRegularSchedule();
   scheduleWeeklyHours.textContent = `${slots.length}時間`;
   scheduleEmpty.hidden = slots.length > 0;
@@ -1286,7 +1330,9 @@ function renderRegularSchedule() {
 }
 
 function renderScheduleProjection() {
-  const projection = calculateScheduleProjection(selectedEventsYear(), loadRegularSchedule(), loadAnnualEvents());
+  const period = loadTeachingPeriod(localStorage, eventsSchool.value, selectedEventsYear(), scheduleSubject.value);
+  document.querySelector("#projection-teaching-period").textContent = `${period.startDate.replaceAll("-", "/")} ～ ${period.endDate.replaceAll("-", "/")}`;
+  const projection = calculateScheduleProjection(selectedEventsYear(), loadRegularSchedule(), loadAnnualEvents(), period);
   document.querySelector("#projection-planned").textContent = `${projection.plannedCount}時間`;
   document.querySelector("#projection-excluded").textContent = `${projection.excludedCount}時間`;
   document.querySelector("#projection-available").textContent = `${projection.availableCount}時間`;
