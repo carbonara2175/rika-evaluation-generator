@@ -266,3 +266,165 @@ test("calendar restoration fails safely when headers or rows are incomplete", ()
   assert.equal(result.ok, false);
   assert.equal(result.error, "日付行を正しく認識できませんでした");
 });
+
+const fiscalMonths = [4, 5, 6, 7, 8, 9, 10, 11, 12, 1, 2, 3];
+const numericMonthLine = fiscalMonths.join(" ");
+function numericCalendar() {
+  const page = calendarWithMissingDayLabels([]);
+  page.items.splice(0, 12, positioned("日", 5, 560),
+    ...fiscalMonths.map((month, index) => positioned(String(month), 55 + index * 70, 560, 18)),
+    positioned("日", 895, 560));
+  return page;
+}
+
+test("numeric fiscal headers ignore flanking 日 and preserve all columns, rows and valid cells", () => {
+  const result = restoreAnnualCalendar(numericCalendar(), 2026);
+  const labeled = restoreAnnualCalendar(calendarWithMissingDayLabels([]), 2026);
+  assert.equal(result.ok, true);
+  assert.equal(result.monthHeaders.length, 12);
+  assert.deepEqual(result.monthHeaders, labeled.monthHeaders);
+  assert.deepEqual(result.monthBoundaries, labeled.monthBoundaries);
+  assert.deepEqual(result.dayRows, labeled.dayRows);
+  assert.equal(result.debug.recognizedDayRowCount, 31);
+  assert.equal(result.cells.length, 365);
+  assert.deepEqual(result.cells.map(({ date, text }) => [date, text]),
+    labeled.cells.map(({ date, text }) => [date, text]));
+  assert.equal(result.debug.monthHeaderLine, numericMonthLine);
+  assert.deepEqual(result.debug.monthHeaderCandidates, [numericMonthLine]);
+  result.monthHeaders.forEach((header, index) => {
+    assert.equal(header.month, fiscalMonths[index]);
+    assert.equal(header.x, 64 + index * 70);
+    if (index) assert.ok(header.x > result.monthHeaders[index - 1].x);
+  });
+});
+
+test("combined numeric headers recover each character center with and without 日", () => {
+  for (const text of [numericMonthLine, `日 ${numericMonthLine} 日`, `日 ${numericMonthLine} 日`.replace(/\d/g, d => String.fromCharCode(d.charCodeAt(0) + 0xfee0))]) {
+    const page = calendarWithMissingDayLabels([]);
+    page.items.splice(0, 12, positioned(text, 50, 560, text.length * 7));
+    const result = restoreAnnualCalendar(page, 2026);
+    assert.equal(result.ok, true);
+    let from = 0;
+    const normalized = text.normalize("NFKC");
+    result.monthHeaders.forEach((header, index) => {
+      const label = String(fiscalMonths[index]);
+      const start = normalized.indexOf(label, from);
+      from = start + label.length;
+      assert.equal(header.x, 50 + (start + label.length / 2) * 7);
+      if (index) assert.ok(header.x > result.monthHeaders[index - 1].x);
+    });
+    assert.equal(result.cells.some(cell => cell.text === numericMonthLine), false);
+  }
+});
+
+test("labeled headers take precedence even when numeric headers are higher", () => {
+  const page = calendarWithMissingDayLabels([]);
+  page.items.push(positioned(`日 ${numericMonthLine} 日`, 10, 585, 880));
+  const result = restoreAnnualCalendar(page, 2026);
+  assert.equal(result.debug.monthHeaderLine, fiscalMonths.map(month => `${month}月`).join(" "));
+  assert.deepEqual(result.monthHeaders, restoreAnnualCalendar(calendarWithMissingDayLabels([]), 2026).monthHeaders);
+});
+
+test("incomplete, reordered, extra, adjacent, nonmonotonic and multiline numeric sequences are rejected", () => {
+  for (const text of ["4 5 6 7 8 9 10 11 12 1 2", "5 4 6 7 8 9 10 11 12 1 2 3",
+    `0 ${numericMonthLine}`, `${numericMonthLine} 4`, numericMonthLine.replace("4 5", "45"), `集計 ${numericMonthLine}`]) {
+    const result = restoreAnnualCalendar({ height: 600, items: [positioned(text, 50, 560, 840)] }, 2026);
+    assert.equal(result.monthHeaders.length, 0, text);
+  }
+  const collapsed = restoreAnnualCalendar({ height: 600, items: [positioned(numericMonthLine, 50, 560, 0)] }, 2026);
+  assert.equal(collapsed.monthHeaders.length, 0);
+  const split = fiscalMonths.map((month, index) => positioned(String(month), 55 + index * 70, index < 6 ? 560 : 540));
+  assert.equal(restoreAnnualCalendar({ height: 600, items: split }, 2026).monthHeaders.length, 0);
+});
+
+test("bottom summary numbers cannot supply a numeric month header; topmost valid candidate wins", () => {
+  for (const height of [600, 0]) {
+    const items = [positioned("年間行事", 50, 590, 60), positioned(numericMonthLine, 50, 50, 840)];
+    assert.equal(restoreAnnualCalendar({ height, items }, 2026).monthHeaders.length, 0);
+  }
+  const page = numericCalendar();
+  page.items.push(positioned(numericMonthLine, 50, 550, 840), positioned(numericMonthLine, 50, 50, 840));
+  const result = restoreAnnualCalendar(page, 2026);
+  assert.equal(result.ok, true);
+  assert.ok(result.monthHeaders.every(header => header.y === 560));
+});
+
+test("uploaded Goshoko R08 PDF header recognizes twelve numeric columns at their actual centers", () => {
+  const page = require("./test-fixtures/goshoko-r08-month-header.json");
+  const result = restoreAnnualCalendar(page, 2026);
+  assert.equal(result.monthHeaders.length, 12);
+  assert.deepEqual(result.monthHeaders.map(header => header.month), fiscalMonths);
+  assert.equal(result.debug.monthHeaderLine, numericMonthLine);
+  const expected = [148.43979825, 233.71116975, 319.112133, 404.3835045,
+    489.654876, 575.05583925, 660.32721075, 745.728174, 830.9995455,
+    916.270917, 1001.67188025, 1086.94325175];
+  result.monthHeaders.forEach((header, index) => {
+    assert.ok(Math.abs(header.x - expected[index]) < 0.000001);
+    if (index) assert.ok(header.x > result.monthHeaders[index - 1].x);
+  });
+  assert.equal(result.error, "日付行を正しく認識できませんでした");
+});
+
+test("all weekday tokens including separate Monday labels are recognized without treating contiguous months as days", () => {
+  const page = calendarWithMissingDayLabels([]);
+  const weekdays = ["月", "火", "水", "木", "金", "土", "日"];
+  for (let day = 1; day <= 31; day += 1) {
+    const y = 530 - (day - 1) * 15;
+    page.items.push(positioned(weekdays[(day - 1) % 7], 20, y));
+  }
+  page.items.push(positioned("6月", 5, 590));
+  const result = restoreAnnualCalendar(page, 2026);
+  assert.equal(result.ok, true);
+  assert.equal(result.debug.recognizedDayRowCount, 31);
+  assert.equal(result.dayRows.find(row => row.day === 6).y, 455);
+  assert.deepEqual(result.debug.interpolatedDayRows, []);
+});
+
+test("positioned day column wins over event numbers and summary duplicates, including duplicates at the same x", () => {
+  const page = calendarWithMissingDayLabels([]);
+  for (const day of [1, 2, 3, 14, 17, 18, 21]) {
+    page.items.push(positioned(String(day), 5, 50 - day),
+      positioned(String(day), 300, 45 - day),
+      positioned(`${day}年総探`, 5, 580 - day));
+  }
+  // Body numbers have all 31 values but run upward, unlike a day column.
+  for (let day = 1; day <= 31; day += 1) page.items.push(positioned(String(day), 300, 60 + day * 10));
+  const result = restoreAnnualCalendar(page, 2026);
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.dayRows, Array.from({ length: 31 }, (_, i) => ({ day: i + 1, y: 530 - i * 15 })));
+  assert.equal(result.debug.recognizedDayRowCount, 31);
+  assert.deepEqual(result.debug.interpolatedDayRows, []);
+});
+
+test("a more complete right day column is selected without averaging competing columns", () => {
+  const page = calendarWithMissingDayLabels([6, 13, 20, 27]);
+  for (let day = 1; day <= 31; day += 1) page.items.push(positioned(String(day), 895, 530 - (day - 1) * 15));
+  const result = restoreAnnualCalendar(page, 2026);
+  assert.equal(result.ok, true);
+  assert.equal(result.debug.recognizedDayRowCount, 31);
+  assert.deepEqual(result.debug.interpolatedDayRows, []);
+});
+
+test("Goshoko actual positioned extraction restores 31 direct day rows and 204 populated cells", () => {
+  const page = require("./test-fixtures/goshoko-r08-calendar-items.json");
+  const result = restoreAnnualCalendar(page, 2026);
+  assert.equal(result.ok, true);
+  assert.equal(result.monthHeaders.length, 12);
+  assert.equal(result.debug.recognizedDayRowCount, 31);
+  assert.equal(result.dayRows.length, 31);
+  assert.deepEqual(result.debug.interpolatedDayRows, []);
+  for (const [day, y] of [[6, 643.320053], [13, 499.68003875], [20, 356.04002375], [27, 212.40005525]]) {
+    assert.ok(Math.abs(result.dayRows.find(row => row.day === day).y - y) < 0.000001);
+  }
+  result.dayRows.forEach((row, index) => {
+    if (index) assert.ok(row.y < result.dayRows[index - 1].y);
+  });
+  assert.equal(result.cells.length, 204);
+  assert.ok(result.cells.some(cell => cell.date === "2026-07-20" && cell.text.includes("海の日")));
+  assert.equal(result.cells.some(cell => /う日数|休業日.*休業日|考査日数/.test(cell.text)), false);
+  const { inferAnnualEventCandidates } = require("./annual-events");
+  const candidates = inferAnnualEventCandidates(result.cells);
+  assert.equal(candidates.length, 61);
+  const { prepareAnnualEventCandidates } = require("./annual-event-candidate-periods");
+  assert.equal(prepareAnnualEventCandidates(candidates).length, 56);
+});

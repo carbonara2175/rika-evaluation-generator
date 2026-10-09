@@ -73,6 +73,19 @@ const eventItems = fixture.cells.flatMap(cell => cell.text.split("\n").map((text
     };
     await checkBounds(".pdf-import-panel"); await checkBounds("#pdf-analysis-details");
     await summary.click(); await checkBounds("#pdf-extracted-text"); await checkBounds("#pdf-calendar-debug");
+    // Numeric fallback traverses the same extraction, candidate and debug UI.
+    const numericHeaders = [item("日", 10, 4000, 5),
+      ...months.map((month, i) => item(String(month), 100 + i * 100 - 5, 4000, 10)),
+      item("日", 1250, 4000, 5)];
+    await importItems([...numericHeaders, ...dayItems, ...eventItems]);
+    assert.equal(await page.locator("#pdf-calendar-body tr").count(), 185);
+    assert.match(await page.locator("#candidate-message").textContent(), /統合前 99件 → 期間候補 67件/);
+    const numericDebug = await page.locator("#pdf-calendar-debug").textContent();
+    assert.ok(numericDebug.includes(`月ヘッダー行: ${months.join(" ")}`));
+    assert.match(numericDebug, /認識月数: 12/);
+    assert.match(numericDebug, /直接認識日付行数: 31/);
+    for (const [i, month] of months.entries()) assert.ok(numericDebug.includes(`${month}月 x=${100 + i * 100}.0`));
+    assert.equal(await page.evaluate(() => JSON.stringify(Object.entries(localStorage).sort()) === window.pdfUiStorageBefore), true);
     // Missing internal row: the existing interpolation stays intact.
     await importItems([...headers, ...dayItems.filter((_, i) => i !== 14), item("確認用行事", 100, 3800 - 15 * 100)]);
     assert.equal(await details.evaluate(el => el.open), false);
