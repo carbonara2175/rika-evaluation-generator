@@ -1,5 +1,8 @@
 "use strict";
 
+const normalizeScheduleTeachingPeriod = typeof module !== "undefined"
+  ? require("./teaching-period.js").normalizeTeachingPeriod : normalizeTeachingPeriod;
+
 // IDs are deliberately independent of their labels so more weekdays can be
 // added later without changing saved schedules.
 const REGULAR_SCHEDULE_DAYS = [
@@ -62,11 +65,12 @@ function utcDateOnly(date) {
   return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}-${String(date.getUTCDate()).padStart(2, "0")}`;
 }
 
-function calculateScheduleProjection(year, slots, events) {
+function calculateScheduleProjection(year, slots, events, teachingPeriod) {
   const fiscalYear = Math.trunc(Number(year));
   const normalizedSlots = normalizeRegularSchedule(slots);
-  const start = new Date(Date.UTC(fiscalYear, 3, 1));
-  const end = new Date(Date.UTC(fiscalYear + 1, 2, 31));
+  const period = normalizeScheduleTeachingPeriod(fiscalYear, teachingPeriod);
+  const start = dateOnlyToUtc(period.startDate);
+  const end = dateOnlyToUtc(period.endDate);
   const unavailableByDate = new Map();
 
   (Array.isArray(events) ? events : []).filter((event) => event?.regularClassesAvailable !== true).forEach((event) => {
@@ -112,10 +116,11 @@ function calculateScheduleProjection(year, slots, events) {
 // Exams are checkpoints only. Their dates are already removed from
 // availableSessions by calculateScheduleProjection, just like every other
 // unavailable annual event.
-function calculateExamCheckpoints(year, slots, events) {
+function calculateExamCheckpoints(year, slots, events, teachingPeriod) {
   const fiscalYear = Math.trunc(Number(year));
-  const fiscalStart = `${fiscalYear}-04-01`;
-  const fiscalEnd = `${fiscalYear + 1}-03-31`;
+  const period = normalizeScheduleTeachingPeriod(fiscalYear, teachingPeriod);
+  const fiscalStart = period.startDate;
+  const fiscalEnd = period.endDate;
   const exams = (Array.isArray(events) ? events : []).filter((event) => event?.category === "exam")
     .map((event) => {
       const start = dateOnlyToUtc(event?.startDate);
@@ -130,7 +135,7 @@ function calculateExamCheckpoints(year, slots, events) {
     })
     .filter((exam) => exam && exam.startDate >= fiscalStart && exam.startDate <= fiscalEnd)
     .sort((a, b) => a.startDate.localeCompare(b.startDate) || a.endDate.localeCompare(b.endDate));
-  const availableSessions = calculateScheduleProjection(fiscalYear, slots, events).availableSessions;
+  const availableSessions = calculateScheduleProjection(fiscalYear, slots, events, period).availableSessions;
   let periodStart = fiscalStart;
 
   return exams.map((exam) => {
