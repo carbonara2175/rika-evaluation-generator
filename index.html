@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="学習指導要領の項目から、物理基礎・物理の3観点の評価規準を作成します。">
     <title>理科 評価規準ジェネレーター</title>
-    <link rel="stylesheet" href="style.css?v=1.16.0">
+    <link rel="stylesheet" href="style.css?v=1.17.0">
     <script src="https://cdn.jsdelivr.net/npm/pizzip@3.2.0/dist/pizzip.min.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/docxtemplater@3.62.0/build/docxtemplater.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js" defer></script>
@@ -19,6 +19,8 @@
     <script src="annual-event-candidates-ui.js?v=1.2.0" defer></script>
     <script src="regular-schedule.js?v=1.3.0" defer></script>
     <script src="script.js?v=1.13.0" defer></script>
+    <script src="storage-backup.js?v=1.0.0" defer></script>
+    <script src="storage-backup-ui.js?v=1.0.0" defer></script>
   </head>
   <body>
     <header class="site-header">
@@ -336,6 +338,27 @@
         </section>
       </div>
     </main>
+
+    <section id="data-management" class="data-management" aria-labelledby="data-management-heading">
+      <h2 id="data-management-heading">データ管理</h2>
+      <p>このブラウザに保存されているアプリデータをJSONファイルへ保存できます。PC変更やブラウザデータ削除に備えて、定期的なバックアップをおすすめします。</p>
+      <p>対象は rika- で始まる保存データです。年間時数配分の手入力設定（annualHours_ で始まるデータ）は対象に含まれません。</p>
+      <p id="backup-count"></p>
+      <div class="backup-actions">
+        <button id="backup-save" type="button">バックアップを保存</button>
+        <button id="backup-load" type="button">バックアップから復元</button>
+        <button id="backup-recovery-save" type="button" hidden>退避データを保存</button>
+      </div>
+      <input id="backup-file" type="file" accept=".json,application/json" hidden>
+      <p id="backup-message" role="status" aria-live="polite"></p>
+    </section>
+    <dialog id="backup-confirmation" aria-labelledby="backup-confirmation-heading" aria-describedby="backup-confirmation-description">
+      <h2 id="backup-confirmation-heading">バックアップから復元</h2>
+      <p>バックアップ日時：<span id="backup-exported-at"></span></p>
+      <p>保存データ：<strong id="backup-entry-count"></strong></p>
+      <p id="backup-confirmation-description">このバックアップで現在のアプリデータを復元します。現在の rika- で始まるデータは置き換えられます。</p>
+      <div class="backup-actions"><button id="backup-cancel" type="button" autofocus>キャンセル</button><button id="backup-confirm-restore" type="button">復元する</button></div>
+    </dialog>
 
     <div class="toast" id="toast" role="status" aria-live="polite">コピーしました</div>
 
