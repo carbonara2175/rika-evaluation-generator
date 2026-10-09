@@ -44,12 +44,12 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || "playwright");
     const [download]=await Promise.all([page.waitForEvent("download"),page.locator("#backup-save").click()]);
     assert.match(download.suggestedFilename(),/^rika-evaluation-generator-backup-\d{4}-\d{2}-\d{2}\.json$/);
     const backup=JSON.parse(fs.readFileSync(await download.path(),"utf8"));
-    const expected=Object.fromEntries(Object.entries(before).filter(([key])=>key.startsWith("rika-")));
+    const expected=Object.fromEntries(Object.entries(before).filter(([key])=>key.startsWith("rika-")||key.startsWith("annualHours_")));
     assert.deepEqual(backup.entries,expected);
     assert.equal(backup.app,"rika-evaluation-generator");assert.equal(backup.backupVersion,1);assert.ok(backup.exportedAt);
     assert.match(await page.locator("#backup-message").textContent(),new RegExp(`${Object.keys(expected).length}件`));
     assert.deepEqual(await page.evaluate(()=>Object.fromEntries(Object.entries(localStorage))),before);
-    await page.evaluate(()=>{localStorage.setItem("rika-future-feature-v1","changed");localStorage.setItem("rika-obsolete","remove");});
+    await page.evaluate(()=>{localStorage.setItem("annualHours_test","changed allocation");localStorage.setItem("annualHours_obsolete","remove allocation");localStorage.setItem("rika-future-feature-v1","changed");localStorage.setItem("rika-obsolete","remove");});
     const changed=await page.evaluate(()=>Object.fromEntries(Object.entries(localStorage)));
     const select=async value=>page.locator("#backup-file").setInputFiles({name:"backup.json",mimeType:"application/json",buffer:Buffer.from(typeof value==="string"?value:JSON.stringify(value))});
     for(const invalid of ["{bad",{...backup,app:"wrong"},{...backup,backupVersion:2},{...backup,entries:[]},{...backup,entries:{foreign:"x"}},{...backup,entries:{"rika-key":9}}]) {

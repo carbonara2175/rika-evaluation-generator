@@ -4,11 +4,15 @@ const BACKUP_APP = "rika-evaluation-generator";
 const BACKUP_VERSION = 1;
 const BACKUP_MAX_BYTES = 10 * 1024 * 1024;
 
+function isAppStorageKey(key) {
+  return typeof key === "string" && (key.startsWith("rika-") || key.startsWith("annualHours_"));
+}
+
 function collectAppEntries(storage) {
   const entries = Object.create(null);
   for (let index = 0; index < storage.length; index += 1) {
     const key = storage.key(index);
-    if (key?.startsWith("rika-")) {
+    if (isAppStorageKey(key)) {
       const value = storage.getItem(key);
       if (typeof value !== "string") throw new Error("保存データを読み取れませんでした。");
       entries[key] = value;
@@ -27,7 +31,7 @@ function validateStorageBackup(backup) {
   if (!backup.entries || typeof backup.entries !== "object" || Array.isArray(backup.entries)) throw new Error("保存データの形式が不正です。");
   const entries = Object.create(null);
   for (const [key, value] of Object.entries(backup.entries)) {
-    if (!key.startsWith("rika-") || typeof value !== "string") throw new Error("保存データのキーまたは値が不正です。");
+    if (!isAppStorageKey(key) || typeof value !== "string") throw new Error("保存データのキーまたは値が不正です。");
     entries[key] = value;
   }
   return { app: BACKUP_APP, backupVersion: BACKUP_VERSION, exportedAt: backup.exportedAt, origin: backup.origin, entries };
@@ -69,6 +73,6 @@ function backupFilename(now = new Date()) {
 }
 
 if (typeof module !== "undefined") module.exports = {
-  BACKUP_APP, BACKUP_VERSION, BACKUP_MAX_BYTES, collectAppEntries, createStorageBackup,
+  BACKUP_APP, BACKUP_VERSION, BACKUP_MAX_BYTES, isAppStorageKey, collectAppEntries, createStorageBackup,
   validateStorageBackup, parseStorageBackup, restoreStorageBackup, backupFilename
 };
