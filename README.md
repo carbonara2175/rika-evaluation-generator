@@ -175,3 +175,17 @@ PLAYWRIGHT_MODULE=/path/to/playwright node lesson-rows.browser-test.js
 標準年間時数（単位数×35）は変えず、月別比例配分へ日数を反映します。考査チェックポイントは対象期間内に開始する考査のみを使い、授業開始日から考査開始日前日までの実施可能時数を累積します。年間時数配分と単元指導計画は年間行事参照年度に対応する同じ設定を読み込みます。既存の年間行事・通常時間割・年間時数配分・単元指導計画・考査範囲の保存キーは変更しません。
 
 授業対象期間の検証：`node --test teaching-period.test.js`、`PLAYWRIGHT_MODULE=/path/to/playwright node teaching-period.browser-test.js`（必要に応じて `CHROMIUM_PATH` を指定）。
+
+### JSONバックアップ・復元
+
+画面下部の「データ管理」で、このブラウザの保存データをJSONファイルへダウンロードし、別PC・別ブラウザへ復元できます。対象はlocalStorageを走査して `key.startsWith("rika-") || key.startsWith("annualHours_")` に一致するすべてのキーです。将来追加されたキーも自動的に含み、値はJSONとして再解釈せず元の文字列のまま保存します。年間時数配分の手入力設定（`annualHours_...`）も対象です。 今回は既存キーの移行・変更を行いません。
+
+ファイルは `rika-evaluation-generator-backup-YYYY-MM-DD.json`（ブラウザのローカル日付）で、`app: "rika-evaluation-generator"`、`backupVersion: 1`、UTCの `exportedAt`、参考情報の `origin`、文字列値の `entries` を含みます。所属・氏名等も含まれるため、ファイルは自分で保管してください。サーバーへの送信は行いません。
+
+復元ファイルは10MB以下に制限し、JSON・アプリ名・バージョン・entriesのオブジェクト形式・全キーの接頭辞・全値の文字列型を検証します。originが違っても復元できます。日時・件数を示す確認画面で「復元する」を押すまで保存領域は変更しません。キャンセルやEscで中止できます。
+
+復元前の対象データをメモリに退避し、全ファイル検証後に現在のrika-・annualHours_キーを削除してバックアップの文字列を保存します。バックアップにないrika-・annualHours_キーは残らず、その他のキーは保持されます。成功後に件数を表示して画面を再読み込みします。途中で削除・書き込みが失敗したら退避データへロールバックします。ブラウザが保存領域への書き込みを継続して拒否し、ロールバックもできない場合は成功扱いにせず、「退避データを保存」から元データをJSONへ救出できます。
+
+追加機能の初期表示・件数取得・エクスポート・ファイル検証は読み取りのみです。既存機能の初期化・保存形式・キーは変更していません。
+
+検証：`node --test storage-backup.test.js`、`PLAYWRIGHT_MODULE=/path/to/playwright node storage-backup.browser-test.js`（必要に応じて `CHROMIUM_PATH` を指定）。
