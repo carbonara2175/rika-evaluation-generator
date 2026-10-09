@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 const { defaultTeachingPeriod, teachingPeriodStorageKey, teachingPeriodValidationError, loadTeachingPeriod, saveTeachingPeriod } = require("./teaching-period");
 const { calculateScheduleProjection, calculateExamCheckpoints } = require("./regular-schedule");
 const { calculateMonthlyAvailableSchoolDays } = require("./annual-events");
-const { calculateAnnualHours, allocateByLargestRemainder } = require("./annual-hours");
+const { calculateAnnualHours, allocateByLargestRemainder, selectExpectedHours } = require("./annual-hours");
 const slots = ["monday", "tuesday", "wednesday", "thursday"].map(dayOfWeek => ({ dayOfWeek, period: 1 }));
 const full = defaultTeachingPeriod(2026);
 const period = { startDate: "2026-04-07", endDate: "2027-02-28" };
@@ -52,3 +52,5 @@ assert.deepEqual(loadTeachingPeriod(storage,"broken",2026,"physics"),full);
 storage.setItem(teachingPeriodStorageKey("broken",2026,"physics"), JSON.stringify({startDate:"2026-02-30",endDate:"2027-03-31"}));
 assert.deepEqual(loadTeachingPeriod(storage,"broken",2026,"physics"),full);
 console.log("Teaching period calculation, validation and independent storage tests passed");
+
+assert.equal(selectExpectedHours({hasRegularSchedule:true,hasAnnualEvents:false,hasTeachingPeriod:true,availableCount:119},140).hours,119);

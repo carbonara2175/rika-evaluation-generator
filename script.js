@@ -303,10 +303,13 @@ function annualEventProjection() {
     const savedEvents = JSON.parse(localStorage.getItem(annualEventsStorageKey(schoolId, year)));
     events = Array.isArray(savedEvents) ? sortAnnualEvents(savedEvents) : [];
   } catch { /* Invalid or unavailable storage is treated as missing data. */ }
+  const period = loadTeachingPeriod(localStorage, schoolId, year, courseId);
+  const bounds = defaultTeachingPeriod(year);
   return {
-    ...calculateScheduleProjection(year, slots, events, loadTeachingPeriod(localStorage, schoolId, year, courseId)),
+    ...calculateScheduleProjection(year, slots, events, period),
     hasRegularSchedule: slots.length > 0,
-    hasAnnualEvents: events.length > 0
+    hasAnnualEvents: events.length > 0,
+    hasTeachingPeriod: period.startDate !== bounds.startDate || period.endDate !== bounds.endDate
   };
 }
 
@@ -441,7 +444,7 @@ function renderAnnual() {
   document.querySelector("#summary-days").textContent = `${totalDays}日`;
   document.querySelector("#summary-expected").textContent = `${Math.round(expected.hours)}時間`;
   document.querySelector("#summary-expected-source").textContent = expected.source === "annual-events"
-    ? `${selectedAnnualEventsReferenceYear()}年度の通常時間割・年間行事から算出`
+    ? `${selectedAnnualEventsReferenceYear()}年度の通常時間割・年間行事・授業対象期間から算出`
     : "年間行事データ未設定のため授業可能日数ベース概算値";
   document.querySelector("#summary-difference-label").textContent = rawDifference < 0 ? "不足見込み" : "余裕見込み";
   document.querySelector("#summary-difference").textContent = `${Math.round(Math.abs(rawDifference))}時間`;
@@ -551,7 +554,7 @@ document.querySelector("#copy-annual-result").addEventListener("click", () => {
   const expected = selectExpectedHours(annualEventProjection(), rawProjectedHours);
   const rawDifference = calculateOperationalDifference(expected.hours, state.actualHours);
   const differenceLabel = rawDifference < 0 ? "不足見込み" : "余裕見込み";
-  const expectedSource = expected.source === "annual-events" ? `${selectedAnnualEventsReferenceYear()}年度の通常時間割・年間行事から算出` : "年間行事データ未設定のため授業可能日数ベース概算値";
+  const expectedSource = expected.source === "annual-events" ? `${selectedAnnualEventsReferenceYear()}年度の通常時間割・年間行事・授業対象期間から算出` : "年間行事データ未設定のため授業可能日数ベース概算値";
   copyText(`学校：${state.schoolName}\n科目：${state.courseName}\n単位数：${state.credits}単位\n標準年間時数：${annualHours}時間\n単元指導計画時数：${state.actualHours}時間\n授業実施見込み：${Math.round(expected.hours)}時間（${expectedSource}）\n${differenceLabel}：${Math.round(Math.abs(rawDifference))}時間\n授業可能日数：${totalDays}日\n標準時数との差：${annualHours - state.actualHours}時間（実施上の余裕ではありません）\n\n月別配当\n${allocationText()}`);
 });
 document.querySelector("#reset-annual").addEventListener("click", () => {

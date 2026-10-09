@@ -34,18 +34,19 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || "playwright");
     await page.locator("#events-year").fill("2026"); await page.locator("#events-year").dispatchEvent("change");
     await page.locator("#schedule-subject").selectOption(fixture.course);
     assert.equal(await page.locator("#teaching-period-start").inputValue(),"2026-04-01");
+    fixture.existing = await page.evaluate(() => Object.fromEntries(Object.entries(localStorage)));
     await page.locator("#teaching-period-start").fill("2026-04-07");
     await page.locator("#teaching-period-end").fill("2027-02-28");
     await page.locator("#teaching-period-form button[type=submit]").click();
     assert.match(await page.locator("#teaching-period-message").textContent(), /保存しました/);
     assert.match(await page.locator("#projection-teaching-period").textContent(), /2026\/04\/07 ～ 2027\/02\/28/);
     const result = await page.evaluate(({school,course,existing}) => {
-      annualSchool.value=school; populateAnnualSubjects(course); annualEventsReferenceYear.value="2026"; saveAnnualEventsReferenceYear(); renderAnnual();
-      planSchool.value=school; planSubject.value=course;
+      for (const [key,value] of Object.entries(existing)) if(localStorage.getItem(key)!==value) throw Error(`Existing data changed: ${key}`);
+      annualSchool.value=school; populateAnnualCourses(course); annualEventsReferenceYear.value="2026"; saveAnnualEventsReferenceYear(); renderAnnual();
+      planSchool.value=school; populatePlanCourses(course);
       const annual = annualExamProjection();
       const plan = planExamProjection(2026);
       const projection = annualEventProjection();
-      for (const [key,value] of Object.entries(existing)) if(localStorage.getItem(key)!==value) throw Error(`Existing data changed: ${key}`);
       return {days:annualEventAvailableDays().days,annual,plan,projection};
     },fixture);
     assert.equal(result.days[11],0);
@@ -54,6 +55,17 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || "playwright");
     assert.equal(result.annual.checkpoints[0].cumulativeHours,2);
     assert.ok(result.projection.scheduledSessions.every(s=>s.date>="2026-04-07" && s.date<="2027-02-28"));
     assert.equal(result.projection.excludedCount,1);
+    await page.evaluate(({school,course}) => {
+      const key = annualEventsStorageKey(school,2026);
+      const saved = localStorage.getItem(key);
+      localStorage.removeItem(key);
+      try {
+        const projection = annualEventProjection();
+        const selected = selectExpectedHours(projection,140);
+        if(selected.hours !== projection.availableCount || selected.source !== "annual-events") throw Error("Custom period did not use timetable without events");
+        if(annualEventAvailableDays().days[11] !== 0) throw Error("March must remain zero without annual events");
+      } finally { localStorage.setItem(key,saved); }
+    },fixture);
     for (const [start,end] of [["2026-04-08","2026-04-07"],["2026-03-31","2027-02-28"]]) {
       await page.locator("#teaching-period-start").fill(start); await page.locator("#teaching-period-end").fill(end);
       await page.locator("#teaching-period-form").evaluate(form=>form.dispatchEvent(new Event("submit",{cancelable:true})));

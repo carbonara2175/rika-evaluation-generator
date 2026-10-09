@@ -39,7 +39,7 @@ function annualEventReferenceYearStorageKey(schoolId, courseId) {
 
 function selectExpectedHours(eventProjection, fallbackHours) {
   const hasEventProjection = eventProjection?.hasRegularSchedule === true
-    && eventProjection?.hasAnnualEvents === true
+    && (eventProjection?.hasAnnualEvents === true || eventProjection?.hasTeachingPeriod === true)
     && Number.isFinite(eventProjection?.availableCount);
   return {
     hours: hasEventProjection ? eventProjection.availableCount : (Number(fallbackHours) || 0),
